@@ -1,0 +1,63 @@
+{ nixpkgs ? import <nixpkgs> {} }:
+
+let
+  name = "much";
+  version = "1";
+
+  buildInputs = with pkgs; [
+    hsEnv
+  ];
+
+  extraCmds = with pkgs; ''
+    export HISTFILE="\$HOME/.history/env-${name}"
+    $(grep export ${hsEnv.outPath}/bin/ghc)
+    ${mkExports staticPkgs}
+  '';
+
+  # ghcWithPackagesOld b/c terminfo collision
+  hsEnv = hsPkgs.ghcWithPackagesOld (self: with self;
+    terminfo.nativeBuildInputs ++
+    [
+      cabalInstall
+      dataDefault
+      vtyUi
+
+      # for NotmuchCmd
+      aeson
+      #blazeHtml
+      caseInsensitive
+      #conduit
+      #conduitExtra
+      process
+      safe
+    ]
+  );
+
+  hsPkgs = pkgs.haskellPackages_ghc783_profiling.override {
+    extension = self: super: with self; {
+      #vty = callPackage ./nixpkgs/vty-5.2.5.nix { #{{{
+      #}; #}}}
+    };
+  };
+
+  pkgs = nixpkgs // staticPkgs;
+  staticPkgs = with nixpkgs; {
+  };
+
+  #{{{ mkExports : set -> string
+  # Create shell script that exports a set's attributes.
+  mkExports = set: with builtins; with pkgs.lib.strings;
+    let
+      # XXX attribute names are not escaped, they have to be sane
+      # XXX the value should not contain <newline>
+      mkExport = k: "export ${k}=${escapeSh (getAttr k set)}";
+      escapeSh = stringAsChars (c: "\\${c}");
+    in
+      concatStringsSep "\n" (map mkExport (attrNames set));
+  #}}}
+
+in pkgs.myEnvFun {
+  name = "${name}-${version}";
+  inherit buildInputs extraCmds;
+}
+# vim: set fdm=marker :
