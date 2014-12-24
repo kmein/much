@@ -25,7 +25,13 @@ data SearchResult = SearchResult {
     , searchMatched :: Int
     , searchTotal :: Int
     }
-  deriving (Show,Eq)
+  deriving (Show)
+
+
+instance Eq SearchResult where
+    s1 == s2 =
+        searchThread s1 == searchThread s2
+
 
 instance FromJSON SearchResult where
     parseJSON (Object v) = SearchResult <$> v .: "thread"
