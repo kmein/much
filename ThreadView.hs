@@ -40,12 +40,12 @@ type LineNr = Int
 
 data ThreadView
     = TVMessage Message
-    | MessageLine Message MessagePart LineNr String
+    | TVMessageLine Message MessagePart LineNr String
     | TVMessagePart Message MessagePart
   deriving (Show)
 
 instance Eq ThreadView where
-    MessageLine m1 mp1 ln1 _s1 == MessageLine m2 mp2 ln2 _s2 =
+    TVMessageLine m1 mp1 ln1 _s1 == TVMessageLine m2 mp2 ln2 _s2 =
         messageId m1 == messageId m2 && mp1 == mp2 && ln1 == ln2
 
     TVMessagePart m1 mp1 == TVMessagePart m2 mp2 =
@@ -59,7 +59,7 @@ instance Eq ThreadView where
 
 describe :: ThreadView -> String
 describe (TVMessage m) = "TVMessage" <> unMessageID (messageId m)
-describe (MessageLine _ _ _ s) = "MessageLine " <> show s
+describe (TVMessageLine _ _ _ s) = "TVMessageLine " <> show s
 describe (TVMessagePart m p) = "TVMessagePart " <> (unMessageID $ messageId m) <> " " <> show (partID p)
 
 
@@ -132,9 +132,9 @@ xconvPartContent m p = \case
         map (xconvLine m p) $ zip [0..] (T.lines t)
     ContentMultipart parts ->
         map (xconvPart2 m) parts
-        -- [Node (MessageLine m p 0 "ContentMultipart") []]
+        -- [Node (TVMessageLine m p 0 "ContentMultipart") []]
     ContentMsgRFC822 _ ->
-        [Node (MessageLine m p 0 "ContentMsgRFC822") []]
+        [Node (TVMessageLine m p 0 "ContentMsgRFC822") []]
 
 
 xconvPart2 :: Message -> MessagePart -> Tree ThreadView
@@ -145,7 +145,7 @@ xconvPart2 m p =
 xconvLine
   :: Message -> MessagePart -> (LineNr, T.Text) -> Tree ThreadView
 xconvLine m p (i, s) =
-    Node (MessageLine m p i $ T.unpack s) []
+    Node (TVMessageLine m p i $ T.unpack s) []
 
 
 
@@ -163,7 +163,7 @@ threadViewImage hasFocus = \case
               messageTags m
         )
 
-    MessageLine _ _ _ s ->
+    TVMessageLine _ _ _ s ->
         string ml s
 
     TVMessagePart _ p ->
