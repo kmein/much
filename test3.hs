@@ -69,8 +69,7 @@ import ThreadView
 
 toggleTag :: T.Text -> ThreadView -> IO ()
 toggleTag tag = \case
-    OpenMessage m -> f m
-    ClosedMessage m -> f m
+    TVMessage m -> f m
     _ -> return ()
   where
     f m = do
@@ -198,8 +197,7 @@ threadImage c (Node n ns) =
   --where
   --  --hasFocus = t_cur == messageId n
   --  hasFocus :: ThreadView -> Bool
-  --  hasFocus (OpenMessage m) = c == m
-  --  hasFocus (ClosedMessage m) = c == m
+  --  hasFocus (TVMessage m) = c == m
   --  hasFocus _ = False
 
 

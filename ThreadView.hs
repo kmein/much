@@ -39,37 +39,28 @@ type LineNr = Int
 
 
 data ThreadView
-    = ClosedMessage Message
-    | OpenMessage Message
+    = TVMessage Message
     | MessageLine Message MessagePart LineNr String
     | TVMessagePart Message MessagePart
   deriving (Show)
 
 instance Eq ThreadView where
     MessageLine m1 mp1 ln1 _s1 == MessageLine m2 mp2 ln2 _s2 =
-        m1 == m2 && mp1 == mp2 && ln1 == ln2
-    a == b =
-        isMessage a && isMessage b && tvMsgId a == tvMsgId b
+        messageId m1 == messageId m2 && mp1 == mp2 && ln1 == ln2
 
+    TVMessagePart m1 mp1 == TVMessagePart m2 mp2 =
+        messageId m1 == messageId m2 && mp1 == mp2
 
-isMessage :: ThreadView -> Bool
-isMessage (ClosedMessage _) = True
-isMessage (OpenMessage _) = True
-isMessage _ = False
+    TVMessage m1 == TVMessage m2 =
+        messageId m1 == messageId m2
 
-
-tvMsgId :: ThreadView -> Maybe MessageID
-tvMsgId (ClosedMessage m) = Just $ messageId m
-tvMsgId (OpenMessage m) = Just $ messageId m
-tvMsgId _ = Nothing
-
+    _ == _ = False
 
 
 describe :: ThreadView -> String
-describe (ClosedMessage m) = "ClosedMessage " <> unMessageID (messageId m)
-describe (OpenMessage m) = "OpenMessage " <> unMessageID (messageId m)
+describe (TVMessage m) = "TVMessage" <> unMessageID (messageId m)
 describe (MessageLine _ _ _ s) = "MessageLine " <> show s
-describe (TVMessagePart _ p) = "TVMessagePart " <> show (partID p)
+describe (TVMessagePart m p) = "TVMessagePart " <> (unMessageID $ messageId m) <> " " <> show (partID p)
 
 
 --focusPrev t_cur t = do
@@ -107,8 +98,7 @@ findMessage :: MessageID -> Tree ThreadView -> Maybe ThreadView
 findMessage i =
     find p . flatten
   where
-    p (ClosedMessage m) = i == messageId m
-    p (OpenMessage m) = i == messageId m
+    p (TVMessage m) = i == messageId m
     p _ = False
 
 findTV :: ThreadView -> Tree ThreadView -> Maybe ThreadView
@@ -116,21 +106,16 @@ findTV x =
     find (==x) . flatten
 
 
-
 fromMessageTree :: Tree Message -> Tree ThreadView
 fromMessageTree (Node m ms) =
     Node m' ms'
   where
-    isOpen = "open" `elem` messageTags m
 
     m' :: ThreadView
-    m' =
-        if isOpen
-            then OpenMessage m
-            else ClosedMessage m
+    m' = TVMessage m
 
     ms' :: Forest ThreadView
-    ms' = if isOpen
+    ms' = if isOpen m
               then xconvBody m <> map fromMessageTree ms
               else map fromMessageTree ms
 
@@ -166,22 +151,14 @@ xconvLine m p (i, s) =
 
 threadViewImage :: Bool -> ThreadView -> Image
 threadViewImage hasFocus = \case
-    ClosedMessage m ->
-        string cm (unMessageID $ messageId m)
+    TVMessage m ->
+        let col = if isOpen m then om else cm
+        in
+        string col (unMessageID $ messageId m)
         <|>
         translateX 1 (
           horizCat $
-              intersperse (string cm ", ") $
-              map (text' tagColor) $
-              messageTags m
-        )
-
-    OpenMessage m ->
-        string om (unMessageID $ messageId m)
-        <|>
-        translateX 1 (
-          horizCat $
-              intersperse (string om ", ") $
+              intersperse (string col ", ") $
               map (text' tagColor) $
               messageTags m
         )
