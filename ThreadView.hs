@@ -63,20 +63,6 @@ describe (TVMessagePart m p) = "TVMessagePart " <> (unMessageID $ messageId m) <
 describe (TVMessageLine _ _ _ s) = "TVMessageLine " <> show s
 
 
---focusPrev t_cur t = do
---    i <- findIndex ((==t_cur) . messageId) msgs
---    m' <- msgs `atMay` (i - 1)
---    return $ messageId m'
---  where
---    msgs = flatten t
---
---focusNext t_cur t = do
---    i <- findIndex ((==t_cur) . messageId) msgs
---    m' <- msgs `atMay` (i + 1)
---    return $ messageId m'
---  where
---    msgs = flatten t
-
 focusPrev :: Tree ThreadView -> Maybe ThreadView -> Maybe ThreadView
 focusPrev v Nothing = lastMay (flatten v)
 focusPrev v (Just cur) = do
@@ -139,7 +125,7 @@ xconvPartContent m p = \case
 
 xconvPart2 :: Message -> MessagePart -> Tree ThreadView
 xconvPart2 m p =
-    Node (TVMessagePart m p) []
+    Node (TVMessagePart m p) $ xconvPartContent m p (partContent p)
 
 
 xconvLine
@@ -165,8 +151,8 @@ threadViewImage hasFocus = \case
 
     TVMessagePart _ p ->
         string mp "TVMessagePart"
+          <|> translateX 1 (string mp $ show $ partID p)
           <|> translateX 1 (string mp $ show $ partContentType p)
-          <-> translateX 2 (partImage p)
 
     TVMessageLine _ _ _ s ->
         string ml s
@@ -203,65 +189,3 @@ threadViewImage hasFocus = \case
     mp_n = withForeColor def $ color 162
 
     color i = Color240 $ -16 + i
-
-
-
-partImage :: MessagePart -> Image
-partImage p = case partContentType p of
-    "text/plain" ->
-        partContentImage $ partContent p
-        --string def (show $ partContent p)
-    "multipart/alternative" ->
-        partContentImage $ partContent p
-    "multipart/signed" ->
-        partContentImage $ partContent p
-    _ ->
-        mempty
-
-
-
-partTextLineImage :: String -> Image
-partTextLineImage s =
-    string def s
-
-
---messageImage hasFocus m@Message{..} =
---    string c1 (unMessageID messageId)
---    <|>
---    translateX 1 (
---      text' c2 (fromJust $ M.lookup "From" messageHeaders)
---    )
---    <|>
---    translateX 1 (
---      horizCat $ intersperse (string c1 ", ") $ map (text' c3) messageTags
---    )
---    <->
---    translateX 4
---        (if "open" `elem` messageTags
---            then messageBodyImage m
---            else mempty)
---
---  where
---    c1 = if hasFocus then c1_focus else c1_nofocus
---    c1_nofocus = withForeColor def $ Color240 $ -16 + 238
---    c1_focus = withForeColor def $ Color240 $ -16 + 244
---    c2 = withForeColor def $ Color240 $ -16 + 106
---    c3 = withForeColor def $ Color240 $ -16 + 199
---
---
---
---
---messageBodyImage = vertCat . map messagePartImage . messageBody
---
---messagePartImage = partContentImage . partContent
---
-
-partContentImage (ContentText t) =
-    vertCat $ map (text' def) $ T.lines t
-
-partContentImage (ContentMultipart parts) =
-    --string def "ContentMultipart"
-    vertCat $ map partImage parts
-
-
-partContentImage (ContentMsgRFC822 _) = string def "ContentMsgRFC822"
