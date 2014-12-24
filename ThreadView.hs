@@ -164,8 +164,8 @@ threadViewImage hasFocus = \case
         )
 
     TVMessagePart _ p ->
-        string def "TVMessagePart"
-          <|> translateX 1 (string def $ show $ partContentType p)
+        string mp "TVMessagePart"
+          <|> translateX 1 (string mp $ show $ partContentType p)
           <-> translateX 2 (partImage p)
 
     TVMessageLine _ _ _ s ->
@@ -197,6 +197,10 @@ threadViewImage hasFocus = \case
     --ph = if hasFocus then ph_y else ph_n
     --ph_y = withForeColor def $ color 241
     --ph_n = withForeColor def $ color 235
+
+    mp = if hasFocus then mp_y else mp_n
+    mp_y = withForeColor def $ color 199
+    mp_n = withForeColor def $ color 162
 
     color i = Color240 $ -16 + i
 
