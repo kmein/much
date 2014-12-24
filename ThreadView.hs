@@ -86,17 +86,17 @@ describe (TVMessagePart _ p) = "TVMessagePart " <> show (partID p)
 --  where
 --    msgs = flatten t
 
-focusPrev :: Maybe ThreadView -> Tree ThreadView -> Maybe ThreadView
-focusPrev Nothing v = lastMay (flatten v)
-focusPrev (Just cur) v = do
+focusPrev :: Tree ThreadView -> Maybe ThreadView -> Maybe ThreadView
+focusPrev v Nothing = lastMay (flatten v)
+focusPrev v (Just cur) = do
     i <- elemIndex cur items
     maybe (lastMay items) Just $ atMay items (i - 1)
   where
     items = flatten v
 
-focusNext :: Maybe ThreadView -> Tree ThreadView -> Maybe ThreadView
-focusNext Nothing v = headMay (flatten v)
-focusNext (Just cur) v = do
+focusNext :: Tree ThreadView -> Maybe ThreadView -> Maybe ThreadView
+focusNext v Nothing = headMay (flatten v)
+focusNext v (Just cur) = do
     i <- elemIndex cur items
     maybe (headMay items) Just $ atMay items (i + 1)
   where

@@ -143,25 +143,25 @@ main =
         update vty pic
         nextEvent vty >>= \e -> case e of
             EvKey KUp [] ->
-                --case focusPrev t_cur t of
-                --case focusPrev c v of
+                --case focusPrev t t_cur of
+                --case focusPrev v c of
                 --    Just t_prev ->
                 --        --rec vty t_prev t
                 --        rec vty (i + 1) t_prev v
                 --    Nothing ->
                 --        --rec vty t_cur t
                 --        rec vty (i + 1) c v
-                rec vty (i + 1) (focusPrev c v) v
+                rec vty (i + 1) (focusPrev v c) v
             EvKey KDown [] ->
-                --case focusNext t_cur t of
-                --case focusNext c v of
+                --case focusNext t t_cur of
+                --case focusNext v c of
                 --    Just t_next ->
                 --        --rec vty t_next t
                 --        rec vty (i + 1) t_next v
                 --    Nothing ->
                 --        --rec vty t_cur t
                 --        rec vty (i + 1) c v
-                rec vty (i + 1) (focusNext c v) v
+                rec vty (i + 1) (focusNext v c) v
             EvKey KEnter [] ->
                 case c of
                     Nothing -> error "no cursor"
