@@ -40,27 +40,27 @@ type LineNr = Int
 
 data ThreadView
     = TVMessage Message
-    | TVMessageLine Message MessagePart LineNr String
     | TVMessagePart Message MessagePart
+    | TVMessageLine Message MessagePart LineNr String
   deriving (Show)
 
 instance Eq ThreadView where
-    TVMessageLine m1 mp1 ln1 _s1 == TVMessageLine m2 mp2 ln2 _s2 =
-        messageId m1 == messageId m2 && mp1 == mp2 && ln1 == ln2
+    TVMessage m1 == TVMessage m2 =
+        messageId m1 == messageId m2
 
     TVMessagePart m1 mp1 == TVMessagePart m2 mp2 =
         messageId m1 == messageId m2 && mp1 == mp2
 
-    TVMessage m1 == TVMessage m2 =
-        messageId m1 == messageId m2
+    TVMessageLine m1 mp1 ln1 _s1 == TVMessageLine m2 mp2 ln2 _s2 =
+        messageId m1 == messageId m2 && mp1 == mp2 && ln1 == ln2
 
     _ == _ = False
 
 
 describe :: ThreadView -> String
 describe (TVMessage m) = "TVMessage" <> unMessageID (messageId m)
-describe (TVMessageLine _ _ _ s) = "TVMessageLine " <> show s
 describe (TVMessagePart m p) = "TVMessagePart " <> (unMessageID $ messageId m) <> " " <> show (partID p)
+describe (TVMessageLine _ _ _ s) = "TVMessageLine " <> show s
 
 
 --focusPrev t_cur t = do
@@ -163,13 +163,13 @@ threadViewImage hasFocus = \case
               messageTags m
         )
 
-    TVMessageLine _ _ _ s ->
-        string ml s
-
     TVMessagePart _ p ->
         string def "TVMessagePart"
           <|> translateX 1 (string def $ show $ partContentType p)
           <-> translateX 2 (partImage p)
+
+    TVMessageLine _ _ _ s ->
+        string ml s
 
   where
     --c1 = if hasFocus then c1_focus else c1_nofocus
