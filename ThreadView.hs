@@ -46,13 +46,13 @@ data ThreadView
 
 instance Eq ThreadView where
     TVMessage m1 == TVMessage m2 =
-        messageId m1 == messageId m2
+        m1 == m2
 
     TVMessagePart m1 mp1 == TVMessagePart m2 mp2 =
-        messageId m1 == messageId m2 && mp1 == mp2
+        m1 == m2 && mp1 == mp2
 
     TVMessageLine m1 mp1 ln1 _s1 == TVMessageLine m2 mp2 ln2 _s2 =
-        messageId m1 == messageId m2 && mp1 == mp2 && ln1 == ln2
+        m1 == m2 && mp1 == mp2 && ln1 == ln2
 
     _ == _ = False
 
