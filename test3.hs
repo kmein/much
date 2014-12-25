@@ -44,6 +44,10 @@ import TreeSearch
 
 
 
+data State = State
+    { vty :: Vty
+    , cursor :: Z.TreePos Z.Full TreeView
+    }
 
 
 
@@ -92,7 +96,7 @@ main =
     finit vty = do
         shutdown vty
 
-    run vty = do
+    run vty0 = do
         --XXX show a single thread
         --t_ <- getThread "0000000000000862"
         --let v = fromMessageTree t_
@@ -101,36 +105,38 @@ main =
 
         let query = "tag:inbox AND NOT tag:killed"
         Right r_ <- search query
-        let v = fromSearchResults query r_
-        rec vty 0 (Z.fromTree v)
+        rec State
+            { vty = vty0
+            , cursor = Z.fromTree $ fromSearchResults query r_
+            }
 
     --rec vty t_cur t = do
     --rec :: Vty -> Int -> Z.TreePos Z.Full TreeView -> Tree TreeView -> IO ()
-    rec :: Vty -> Int -> Z.TreePos Z.Full TreeView -> IO ()
-    rec vty i c = do
+    rec :: State -> IO ()
+    rec q@State{..} = do
         let
             img =
                 --string def (show i) <->
-                --string def (maybe "Nothing" describe (focusPrev v c)) <->
-                --string def (maybe "Nothing" describe c) <->
-                --string def (maybe "Nothing" describe (focusNext v c)) <->
-                --string def (maybe "Nothing" describe (focusPrev v c)) <->
-                --string def (describe $ Z.label c) <->
-                --string def (maybe "Nothing" describe (focusNext v c)) <->
-                treeImage (Just $ Z.label c) (Z.toTree c)
+                --string def (maybe "Nothing" describe (focusPrev v cursor)) <->
+                --string def (maybe "Nothing" describe cursor) <->
+                --string def (maybe "Nothing" describe (focusNext v cursor)) <->
+                --string def (maybe "Nothing" describe (focusPrev v cursor)) <->
+                --string def (describe $ Z.label cursor) <->
+                --string def (maybe "Nothing" describe (focusNext v cursor)) <->
+                treeImage (Just $ Z.label cursor) (Z.toTree cursor)
             pic = picForImage img
-            --v = Z.root c
+            --v = Z.root cursor
         update vty pic
         nextEvent vty >>= \e -> case e of
             EvKey KUp [] ->
-                rec vty (i + 1) (fromMaybe (Z.root c) $ findPrev c)
+                rec q { cursor = fromMaybe (Z.root cursor) $ findPrev cursor }
             EvKey KDown [] ->
-                rec vty (i + 1) (fromMaybe (Z.root c) $ findNext c)
+                rec q { cursor = fromMaybe (Z.root cursor) $ findNext cursor }
             EvKey KEnter [] ->
-                onEnter c
+                onEnter cursor
 
             EvResize _w _h ->
-                rec vty (i + 1) c
+                rec q
 
             _ -> do
                 print $ "Last event was: " ++ show e
@@ -139,7 +145,7 @@ main =
             TVMessage m -> do
                 toggleTag "open" m
 
-                let loc = c
+                let loc = cursor
                     Just sr = findParent isTVSearchResult loc
                     --Just sr0 = Z.firstChild sr -- TODO can there be only one (thread per sr)?
                     TVSearchResult the_sr = Z.label sr
@@ -147,13 +153,14 @@ main =
 
                 t_ <- return . (:[]) . fromMessageTree =<< getThread tid
 
-                rec vty 0 $ fromMaybe (error "couldn't reselect")
-                          $ findTree (==Z.label c)
+                rec q { cursor = fromMaybe (error "couldn't reselect")
+                          $ findTree (==Z.label cursor)
                           $ Z.modifyTree (\(Node l _) -> Node l t_) sr
+                      }
 
             TVSearchResult sr -> do
                 --let Just loc = findTree (==c_) $ Z.fromTree v
-                let loc = c
+                let loc = cursor
 
                 let open = not $ null $ subForest $ Z.tree loc
                 let ThreadID tid = searchThread sr
@@ -163,11 +170,11 @@ main =
                         then return []
                         else return . (:[]) . fromMessageTree =<< getThread tid
 
-                rec vty 0 $ Z.modifyTree (\(Node l _) -> Node l t_) loc
+                rec q { cursor = Z.modifyTree (\(Node l _) -> Node l t_) loc }
 
             _ ->
                 -- TODO make some noise
-                rec vty (i + 1) c
+                rec q
 
 treeImage :: Maybe TreeView -> Tree TreeView -> Image
 --treeImage t_cur (Node n ns) =
