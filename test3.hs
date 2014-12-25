@@ -158,7 +158,7 @@ main' query =
                     TVSearchResult the_sr = Z.label sr
                     ThreadID tid = searchThread the_sr
 
-                t_ <- return . (:[]) . fromMessageTree =<< getThread tid
+                t_ <- return . fromMessageForest =<< getThread tid
 
                 let loc' = Z.modifyTree (\(Node l _) -> Node l t_) sr
                 rec q { cursor = select (==Z.label cursor) loc' }
@@ -173,7 +173,7 @@ main' query =
                 t_ <-
                     if open
                         then return []
-                        else return . (:[]) . fromMessageTree =<< getThread tid
+                        else return . fromMessageForest =<< getThread tid
 
                 let loc' = Z.modifyTree (\(Node l _) -> Node l t_) loc
                 rec q { cursor = select (==Z.label cursor) loc' }

@@ -99,6 +99,10 @@ fromSearchResults query =
     Node (TVSearch query) . map (\r -> Node (TVSearchResult r) [])
 
 
+fromMessageForest :: Forest Message -> Forest TreeView
+fromMessageForest = map fromMessageTree
+
+
 fromMessageTree :: Tree Message -> Tree TreeView
 fromMessageTree (Node m ms) =
     Node m' ms'

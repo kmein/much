@@ -114,7 +114,7 @@ showThread tid = do
     Prelude.putStrLn $ showTree $ ttt
 
 
-getThread :: String -> IO (Tree Message)
+getThread :: String -> IO (Forest Message)
 getThread tid = do
     c' <- notmuch [ "show", "--format=json", "--format-version=2"
                    , "thread:" <> tid ]
@@ -123,7 +123,7 @@ getThread tid = do
                       Left err -> error err
                       Right x -> x
         --threadsF = map threadForest threads
-        ttt = head $ threadForest $ head $ threads
+        ttt = threadForest $ head $ threads
     return ttt
 
 
