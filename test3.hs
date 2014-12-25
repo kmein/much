@@ -48,6 +48,7 @@ data State = State
     , cursor :: Z.TreePos Z.Full TreeView
     , xoffset :: Int
     , yoffset :: Int
+    , message :: String
     }
 
 
@@ -98,6 +99,7 @@ main' query =
             , cursor = Z.fromTree $ fromSearchResults query r_
             , xoffset = 0
             , yoffset = 0
+            , message = "Welcome to much; quit with ^C"
             }
 
     rec :: State -> IO ()
@@ -113,10 +115,15 @@ main' query =
                 --string def (maybe "Nothing" describe (focusNext v cursor)) <->
                 treeImage (Just $ Z.label cursor) (Z.toTree cursor)
                 --renderTree q
-            pic = picForImage $ translate xoffset yoffset img
+            pic = picForImage $
+                    (string def message) <->
+                    translate xoffset yoffset img
             --v = Z.root cursor
         update vty pic
         nextEvent vty >>= \e -> case e of
+            EvKey (KChar 'c') [MCtrl] ->
+                error "^C"
+
             EvKey (KChar 'k') [] ->
                 rec q { cursor = fromMaybe (Z.root cursor) $ findPrev cursor }
             EvKey (KChar 'j') [] ->
@@ -133,7 +140,7 @@ main' query =
                 rec q
 
             _ -> do
-                error $ "Last event was: " ++ show e
+                rec q { message = "unbound key: " ++ show e }
       where
         onEnter c_ = case Z.label c_ of
             TVMessage m -> do
