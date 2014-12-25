@@ -43,13 +43,12 @@ import TreeView
 import TreeSearch
 
 
-
 data State = State
     { vty :: Vty
     , cursor :: Z.TreePos Z.Full TreeView
+    , xoffset :: Int
+    , yoffset :: Int
     }
-
-
 
 
 toggleTag :: T.Text -> Message -> IO ()
@@ -63,19 +62,6 @@ toggleTag tag m = do
   where
     tagString = T.unpack tag
 
-
---toggleTag tag t_cur t =
---    case focusMessage t_cur t of
---        Nothing -> return ()
---        Just m -> do
---            if tag `elem` messageTags m
---                then
---                    unsetTag tagString (unMessageID $ messageId m)
---                else
---                    setTag tagString (unMessageID $ messageId m)
---            return ()
---  where
---    tagString = T.unpack tag
 
 tagMessage :: T.Text -> Message -> IO LBS.ByteString
 tagMessage tag m =
@@ -108,10 +94,10 @@ main =
         rec State
             { vty = vty0
             , cursor = Z.fromTree $ fromSearchResults query r_
+            , xoffset = 0
+            , yoffset = 0
             }
 
-    --rec vty t_cur t = do
-    --rec :: Vty -> Int -> Z.TreePos Z.Full TreeView -> Tree TreeView -> IO ()
     rec :: State -> IO ()
     rec q@State{..} = do
         let
@@ -124,22 +110,28 @@ main =
                 --string def (describe $ Z.label cursor) <->
                 --string def (maybe "Nothing" describe (focusNext v cursor)) <->
                 treeImage (Just $ Z.label cursor) (Z.toTree cursor)
-            pic = picForImage img
+                --renderTree q
+            pic = picForImage $ translate xoffset yoffset img
             --v = Z.root cursor
         update vty pic
         nextEvent vty >>= \e -> case e of
-            EvKey KUp [] ->
+            EvKey (KChar 'k') [] ->
                 rec q { cursor = fromMaybe (Z.root cursor) $ findPrev cursor }
-            EvKey KDown [] ->
+            EvKey (KChar 'j') [] ->
                 rec q { cursor = fromMaybe (Z.root cursor) $ findNext cursor }
             EvKey KEnter [] ->
                 onEnter cursor
+
+            EvKey (KChar 'H') [] -> rec q { xoffset = xoffset - 1 }
+            EvKey (KChar 'L') [] -> rec q { xoffset = xoffset + 1 }
+            EvKey (KChar 'J') [] -> rec q { yoffset = yoffset - 1 }
+            EvKey (KChar 'K') [] -> rec q { yoffset = yoffset + 1 }
 
             EvResize _w _h ->
                 rec q
 
             _ -> do
-                print $ "Last event was: " ++ show e
+                error $ "Last event was: " ++ show e
       where
         onEnter c_ = case Z.label c_ of
             TVMessage m -> do
@@ -153,10 +145,8 @@ main =
 
                 t_ <- return . (:[]) . fromMessageTree =<< getThread tid
 
-                rec q { cursor = fromMaybe (error "couldn't reselect")
-                          $ findTree (==Z.label cursor)
-                          $ Z.modifyTree (\(Node l _) -> Node l t_) sr
-                      }
+                let loc' = Z.modifyTree (\(Node l _) -> Node l t_) sr
+                rec q { cursor = select (==Z.label cursor) loc' }
 
             TVSearchResult sr -> do
                 --let Just loc = findTree (==c_) $ Z.fromTree v
@@ -170,92 +160,19 @@ main =
                         then return []
                         else return . (:[]) . fromMessageTree =<< getThread tid
 
-                rec q { cursor = Z.modifyTree (\(Node l _) -> Node l t_) loc }
+                let loc' = Z.modifyTree (\(Node l _) -> Node l t_) loc
+                rec q { cursor = select (==Z.label cursor) loc' }
 
             _ ->
                 -- TODO make some noise
                 rec q
 
+
+select :: (a -> Bool) -> Z.TreePos Z.Full a -> Z.TreePos Z.Full a
+select p loc = fromMaybe (error "cannot select") $ findTree p $ Z.root loc
+
+
 treeImage :: Maybe TreeView -> Tree TreeView -> Image
---treeImage t_cur (Node n ns) =
 treeImage c (Node n ns) =
-    --messageImage hasFocus n
-    --treeViewImage (hasFocus n) n
-    treeViewImage (c == Just n) n
-    <->
+    treeViewImage (c == Just n) n <->
     translateX 2 (vertCat $ map (treeImage c) ns)
-  --where
-  --  --hasFocus = t_cur == messageId n
-  --  hasFocus :: TreeView -> Bool
-  --  hasFocus (TVMessage m) = c == m
-  --  hasFocus _ = False
-
-
---showTree' :: Tree Message -> [String]
---showTree' (Node n ns) =
---    -- (if length ns == 0
---    --     then indentMessageInit $ drawMessage n
---    --     else indentMessageLast $ drawMessage n)
---    drawMessage n
---    ++
---    concat (indentChildren (map showTree' ns))
-
-
---messageImage hasFocus m@Message{..} =
---    string c1 (unMessageID messageId)
---    <|>
---    translateX 1 (
---      text' c2 (fromJust $ M.lookup "From" messageHeaders)
---    )
---    <|>
---    translateX 1 (
---      horizCat $ intersperse (string c1 ", ") $ map (text' c3) messageTags
---    )
---    <->
---    translateX 4
---        (if "open" `elem` messageTags
---            then messageBodyImage m
---            else mempty)
---
---  where
---    c1 = if hasFocus then c1_focus else c1_nofocus
---    c1_nofocus = withForeColor def $ Color240 $ -16 + 238
---    c1_focus = withForeColor def $ Color240 $ -16 + 244
---    c2 = withForeColor def $ Color240 $ -16 + 106
---    c3 = withForeColor def $ Color240 $ -16 + 199
-
-
-
-
---messageBodyImage = vertCat . map messagePartImage . messageBody
---
---messagePartImage = partContentImage . partContent
---
---partContentImage (ContentText t) =
---    vertCat $ map (text' def) $ T.lines t
---
---partContentImage (ContentMultipart _) = string def "ContentMultipart"
---partContentImage (ContentMsgRFC822 _) = string def "ContentMsgRFC822"
-
-
-
-
-
-
-
---    ----unMessageID messageId
---    --show messageTime
---    --  -- <> " " <> T.unpack messageDateRel
---    --  <> "\n" <> show (fromJust $ M.lookup "From" messageHeaders)
---    --  <> "\n" <> show (fromJust $ M.lookup "Subject" messageHeaders)
---    [ gray (unMessageID messageId)
---      <> " " <> T.unpack (fromJust $ M.lookup "From" messageHeaders)
---      <> " " <> gray (show messageDateRel)
---      <> " " <> T.unpack (T.intercalate ", " $ map magenta messageTags)
---    -- , T.unpack $ fromJust $ M.lookup "Subject" messageHeaders
---    ]
---    ++
---    (if "open" `elem` messageTags
---        then concat (map (map green . lines . drawMessagePart) messageBody)
---        else [])
---    --map drawMessagePart messageBody
