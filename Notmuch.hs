@@ -251,6 +251,7 @@ drawSearchResult SearchResult{..} = do
             case T.splitOn "| " searchAuthors of
                 [a,b] -> (T.splitOn ", " a, T.splitOn ", " b)
                 [a] -> (T.splitOn ", " a, [])
+                x -> error $ "drawSearchResult: error " <> show x
 
         a' = map green matchedAuthors
         b' = map red otherAuthors
