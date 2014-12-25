@@ -21,13 +21,14 @@ import Data.Tree
 --import qualified Data.ByteString.Lazy as LBS
 --import qualified Data.ByteString.Char8 as BS8
 --import qualified Data.Text.Lazy as TL
+import qualified Data.CaseInsensitive as CI
 import qualified Data.Text as T
 --import qualified Data.Text.Encoding as T
 --import qualified Data.Text.IO as T
 --import Data.Version (Version(..), parseVersion)
 --import System.Process
 --import System.IO
---import qualified Data.Map as M
+import qualified Data.Map as M
 
 import Notmuch.Message
 import Notmuch.SearchResult
@@ -39,6 +40,7 @@ type LineNr = Int
 
 data TreeView
     = TVMessage Message
+    | TVMessageHeaderField Message (CI.CI T.Text)
     | TVMessagePart Message MessagePart
     | TVMessageLine Message MessagePart LineNr String
     | TVSearch String
@@ -48,6 +50,9 @@ data TreeView
 instance Eq TreeView where
     TVMessage m1 == TVMessage m2 =
         m1 == m2
+
+    TVMessageHeaderField m1 mhf1 == TVMessageHeaderField m2 mhf2 =
+        m1 == m2 && mhf1 == mhf2
 
     TVMessagePart m1 mp1 == TVMessagePart m2 mp2 =
         m1 == m2 && mp1 == mp2
@@ -71,6 +76,7 @@ isTVSearchResult _ = False
 
 describe :: TreeView -> String
 describe (TVMessage m) = "TVMessage " <> unMessageID (messageId m)
+describe (TVMessageHeaderField m k) = "TVMessageHeaderField " <> unMessageID (messageId m) <> " " <> T.unpack (CI.original k)
 describe (TVMessagePart m p) = "TVMessagePart " <> (unMessageID $ messageId m) <> " " <> show (partID p)
 describe (TVMessageLine _ _ _ s) = "TVMessageLine " <> show s
 describe (TVSearch s) = "TVSearch " <> show s
@@ -104,8 +110,18 @@ fromMessageTree (Node m ms) =
 
     ms' :: Forest TreeView
     ms' = if isOpen m
-              then xconvBody m <> map fromMessageTree ms
+              then xconvHead m <> xconvBody m <> map fromMessageTree ms
               else map fromMessageTree ms
+
+
+xconvHead :: Message -> Forest TreeView
+xconvHead m =
+    map conv [ "From", "To" ]
+    -- TODO add Subject if it differs from thread subject
+  where
+    conv k =
+      Node (TVMessageHeaderField m k) []
+
 
 xconvBody :: Message -> Forest TreeView
 xconvBody m = mconcat $ map (xconvPart m) (messageBody m)
@@ -150,6 +166,13 @@ treeViewImage hasFocus = \case
               map (text' tagColor) $
               messageTags m
         )
+
+    TVMessageHeaderField m fieldName ->
+        let k = string mhf $ T.unpack $ CI.original fieldName
+            v = maybe (string mhf_empty "nothing")
+                      (string mhf . T.unpack)
+                      (M.lookup fieldName $ messageHeaders m)
+        in k <|> string mhf ": " <|> v
 
     TVMessagePart _ p ->
         string mp "TVMessagePart"
@@ -202,6 +225,14 @@ treeViewImage hasFocus = \case
     ml = if hasFocus then ml_y else ml_n
     ml_y = withForeColor def $ color 226
     ml_n = withForeColor def $ color 202
+
+    mhf = if hasFocus then mhf_y else mhf_n
+    mhf_y = withForeColor def $ color 248
+    mhf_n = withForeColor def $ color 244
+
+    mhf_empty = if hasFocus then mhf_empty_y else mhf_empty_n
+    mhf_empty_y = withForeColor def $ color 88
+    mhf_empty_n = withForeColor def $ color 52
 
     --ph = if hasFocus then ph_y else ph_n
     --ph_y = withForeColor def $ color 241
