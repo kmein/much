@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 
-module ThreadView where
+module TreeView where
 
 import Data.Default
 import Graphics.Vty
@@ -37,7 +37,7 @@ import Safe
 type LineNr = Int
 
 
-data ThreadView
+data TreeView
     = TVMessage Message
     | TVMessagePart Message MessagePart
     | TVMessageLine Message MessagePart LineNr String
@@ -45,7 +45,7 @@ data ThreadView
     | TVSearchResult SearchResult
   deriving (Show)
 
-instance Eq ThreadView where
+instance Eq TreeView where
     TVMessage m1 == TVMessage m2 =
         m1 == m2
 
@@ -64,12 +64,12 @@ instance Eq ThreadView where
     _ == _ = False
 
 
-isTVSearchResult :: ThreadView -> Bool
+isTVSearchResult :: TreeView -> Bool
 isTVSearchResult (TVSearchResult _) = True
 isTVSearchResult _ = False
 
 
-describe :: ThreadView -> String
+describe :: TreeView -> String
 describe (TVMessage m) = "TVMessage " <> unMessageID (messageId m)
 describe (TVMessagePart m p) = "TVMessagePart " <> (unMessageID $ messageId m) <> " " <> show (partID p)
 describe (TVMessageLine _ _ _ s) = "TVMessageLine " <> show s
@@ -77,44 +77,44 @@ describe (TVSearch s) = "TVSearch " <> show s
 describe (TVSearchResult sr) = "TVSearchResult " <> show (searchTotal sr)
 
 
-findMessage :: MessageID -> Tree ThreadView -> Maybe ThreadView
+findMessage :: MessageID -> Tree TreeView -> Maybe TreeView
 findMessage i =
     find p . flatten
   where
     p (TVMessage m) = i == messageId m
     p _ = False
 
-findTV :: ThreadView -> Tree ThreadView -> Maybe ThreadView
+findTV :: TreeView -> Tree TreeView -> Maybe TreeView
 findTV x =
     find (==x) . flatten
 
 
-fromSearchResults :: String -> [SearchResult] -> Tree ThreadView
+fromSearchResults :: String -> [SearchResult] -> Tree TreeView
 fromSearchResults query =
     Node (TVSearch query) . map (\r -> Node (TVSearchResult r) [])
 
 
-fromMessageTree :: Tree Message -> Tree ThreadView
+fromMessageTree :: Tree Message -> Tree TreeView
 fromMessageTree (Node m ms) =
     Node m' ms'
   where
 
-    m' :: ThreadView
+    m' :: TreeView
     m' = TVMessage m
 
-    ms' :: Forest ThreadView
+    ms' :: Forest TreeView
     ms' = if isOpen m
               then xconvBody m <> map fromMessageTree ms
               else map fromMessageTree ms
 
-xconvBody :: Message -> Forest ThreadView
+xconvBody :: Message -> Forest TreeView
 xconvBody m = mconcat $ map (xconvPart m) (messageBody m)
 
-xconvPart :: Message -> MessagePart -> Forest ThreadView
+xconvPart :: Message -> MessagePart -> Forest TreeView
 xconvPart m p = xconvPartContent m p $ partContent p
 
 xconvPartContent
-  :: Message -> MessagePart -> MessageContent -> Forest ThreadView
+  :: Message -> MessagePart -> MessageContent -> Forest TreeView
 xconvPartContent m p = \case
     ContentText t ->
         map (xconvLine m p) $ zip [0..] (T.lines t)
@@ -125,20 +125,20 @@ xconvPartContent m p = \case
         [Node (TVMessageLine m p 0 "ContentMsgRFC822") []]
 
 
-xconvPart2 :: Message -> MessagePart -> Tree ThreadView
+xconvPart2 :: Message -> MessagePart -> Tree TreeView
 xconvPart2 m p =
     Node (TVMessagePart m p) $ xconvPartContent m p (partContent p)
 
 
 xconvLine
-  :: Message -> MessagePart -> (LineNr, T.Text) -> Tree ThreadView
+  :: Message -> MessagePart -> (LineNr, T.Text) -> Tree TreeView
 xconvLine m p (i, s) =
     Node (TVMessageLine m p i $ T.unpack s) []
 
 
 
-threadViewImage :: Bool -> ThreadView -> Image
-threadViewImage hasFocus = \case
+treeViewImage :: Bool -> TreeView -> Image
+treeViewImage hasFocus = \case
     TVMessage m ->
         let col = if isOpen m then om else cm
         in

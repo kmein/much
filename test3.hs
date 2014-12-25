@@ -38,7 +38,7 @@ import Notmuch.SearchResult
 
 import Control.Exception
 
-import ThreadView
+import TreeView
 
 import TreeSearch
 
@@ -105,8 +105,8 @@ main =
         rec vty 0 (Z.fromTree v)
 
     --rec vty t_cur t = do
-    --rec :: Vty -> Int -> Z.TreePos Z.Full ThreadView -> Tree ThreadView -> IO ()
-    rec :: Vty -> Int -> Z.TreePos Z.Full ThreadView -> IO ()
+    --rec :: Vty -> Int -> Z.TreePos Z.Full TreeView -> Tree TreeView -> IO ()
+    rec :: Vty -> Int -> Z.TreePos Z.Full TreeView -> IO ()
     rec vty i c = do
         let
             img =
@@ -117,7 +117,7 @@ main =
                 --string def (maybe "Nothing" describe (focusPrev v c)) <->
                 --string def (describe $ Z.label c) <->
                 --string def (maybe "Nothing" describe (focusNext v c)) <->
-                threadImage (Just $ Z.label c) (Z.toTree c)
+                treeImage (Just $ Z.label c) (Z.toTree c)
             pic = picForImage img
             v = Z.root c
         update vty pic
@@ -166,17 +166,17 @@ main =
                 rec vty 0 $ Z.modifyTree (\(Node l _) -> Node l t_) loc
 
 
-threadImage :: Maybe ThreadView -> Tree ThreadView -> Image
---threadImage t_cur (Node n ns) =
-threadImage c (Node n ns) =
+treeImage :: Maybe TreeView -> Tree TreeView -> Image
+--treeImage t_cur (Node n ns) =
+treeImage c (Node n ns) =
     --messageImage hasFocus n
-    --threadViewImage (hasFocus n) n
-    threadViewImage (c == Just n) n
+    --treeViewImage (hasFocus n) n
+    treeViewImage (c == Just n) n
     <->
-    translateX 2 (vertCat $ map (threadImage c) ns)
+    translateX 2 (vertCat $ map (treeImage c) ns)
   --where
   --  --hasFocus = t_cur == messageId n
-  --  hasFocus :: ThreadView -> Bool
+  --  hasFocus :: TreeView -> Bool
   --  hasFocus (TVMessage m) = c == m
   --  hasFocus _ = False
 
