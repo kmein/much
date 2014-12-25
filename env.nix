@@ -29,6 +29,7 @@ let
       #conduit
       #conduitExtra
       process
+      rosezipper
       safe
     ]
   );

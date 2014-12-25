@@ -29,9 +29,8 @@ import qualified Data.Text as T
 --import System.IO
 --import qualified Data.Map as M
 
---import Notmuch.SearchResult
 import Notmuch.Message
---import Notmuch
+import Notmuch.SearchResult
 import Safe
 
 
@@ -42,6 +41,8 @@ data ThreadView
     = TVMessage Message
     | TVMessagePart Message MessagePart
     | TVMessageLine Message MessagePart LineNr String
+    | TVSearch String
+    | TVSearchResult SearchResult
   deriving (Show)
 
 instance Eq ThreadView where
@@ -54,13 +55,21 @@ instance Eq ThreadView where
     TVMessageLine m1 mp1 ln1 _s1 == TVMessageLine m2 mp2 ln2 _s2 =
         m1 == m2 && mp1 == mp2 && ln1 == ln2
 
+    TVSearch s1 == TVSearch s2 =
+        s1 == s2
+
+    TVSearchResult s1 == TVSearchResult s2 =
+        s1 == s2
+
     _ == _ = False
 
 
 describe :: ThreadView -> String
-describe (TVMessage m) = "TVMessage" <> unMessageID (messageId m)
+describe (TVMessage m) = "TVMessage " <> unMessageID (messageId m)
 describe (TVMessagePart m p) = "TVMessagePart " <> (unMessageID $ messageId m) <> " " <> show (partID p)
 describe (TVMessageLine _ _ _ s) = "TVMessageLine " <> show s
+describe (TVSearch s) = "TVSearch " <> show s
+describe (TVSearchResult sr) = "TVSearchResult " <> show (searchTotal sr)
 
 
 focusPrev :: Tree ThreadView -> Maybe ThreadView -> Maybe ThreadView
@@ -90,6 +99,11 @@ findMessage i =
 findTV :: ThreadView -> Tree ThreadView -> Maybe ThreadView
 findTV x =
     find (==x) . flatten
+
+
+fromSearchResults :: String -> [SearchResult] -> Tree ThreadView
+fromSearchResults query =
+    Node (TVSearch query) . map (\r -> Node (TVSearchResult r) [])
 
 
 fromMessageTree :: Tree Message -> Tree ThreadView
@@ -157,6 +171,27 @@ threadViewImage hasFocus = \case
     TVMessageLine _ _ _ s ->
         string ml s
 
+    TVSearch s ->
+        string sColor s
+
+    TVSearchResult sr -> do
+        let ThreadID tid = searchThread sr
+        --string srColor tid
+        -- <|>
+        --translateX 1
+        (string srColor $ padl 11 ' ' $ T.unpack $ searchDateRel sr)
+        <|>
+        string srColor " ("
+        <|>
+        (string srColor $ show $ searchMatched sr)
+        <|>
+        string srColor ")"
+        <|>
+        string srColor "  "
+        -- <|>
+        -- (string srColor $ show $ searchTime sr)
+        <|>
+        (string srColor $ T.unpack $ searchSubject sr)
   where
     --c1 = if hasFocus then c1_focus else c1_nofocus
     --c1_nofocus = withForeColor def $ Color240 $ -16 + 238
@@ -188,4 +223,19 @@ threadViewImage hasFocus = \case
     mp_y = withForeColor def $ color 199
     mp_n = withForeColor def $ color 162
 
+    sColor = if hasFocus then sColor_y else sColor_n
+    sColor_y = withForeColor def $ color 196
+    sColor_n = withForeColor def $ color  88
+
+    srColor = if hasFocus then srColor_y else srColor_n
+    srColor_y = withForeColor def $ color 197
+    srColor_n = withForeColor def $ color  89
+
     color i = Color240 $ -16 + i
+
+
+
+padl n c s =
+    if length s < n
+        then padl n c (c:s)
+        else s

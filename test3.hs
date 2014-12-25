@@ -18,6 +18,7 @@ import Graphics.Vty
 --import Data.String
 --import Data.Traversable
 import Data.Tree
+import qualified Data.Tree.Zipper as Z
 --import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 --import qualified Data.ByteString.Char8 as BS8
@@ -30,15 +31,16 @@ import qualified Data.Text as T
 --import System.IO
 --import qualified Data.Map as M
 
---import Notmuch.SearchResult
+import Notmuch
 import Notmuch.Message
-import Notmuch -- hiding (focusPrev, focusNext)
+import Notmuch.SearchResult
 --import Safe
 
 import Control.Exception
 
 import ThreadView
 
+import TreeSearch
 
 
 
@@ -67,18 +69,15 @@ import ThreadView
 --    msgs = flatten t
 
 
-toggleTag :: T.Text -> ThreadView -> IO ()
-toggleTag tag = \case
-    TVMessage m -> f m
-    _ -> return ()
+toggleTag :: T.Text -> Message -> IO ()
+toggleTag tag m = do
+    _ <- if tag `elem` messageTags m
+        then
+            unsetTag tagString (unMessageID $ messageId m)
+        else
+            setTag tagString (unMessageID $ messageId m)
+    return ()
   where
-    f m = do
-        _ <- if tag `elem` messageTags m
-            then
-                unsetTag tagString (unMessageID $ messageId m)
-            else
-                setTag tagString (unMessageID $ messageId m)
-        return ()
     tagString = T.unpack tag
 
 

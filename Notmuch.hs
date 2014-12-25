@@ -89,15 +89,14 @@ notmuch args = do
 --    BS.hGetContents hout
 
 
-search :: String -> IO ()
-search term = do
-    c <- notmuch [ "search", "--format=json", "--format-version=2", term ]
+search :: String -> IO (Either String [SearchResult])
+search term =
+    notmuch [ "search", "--format=json", "--format-version=2", term ]
+        >>= return . eitherDecode'
 
-    let results = case eitherDecode' c :: Either String [SearchResult] of
-                      Left err -> error err
-                      Right x -> x
 
-    mapM_ (T.putStrLn . drawSearchResult) results
+putSearchResults :: [SearchResult] -> IO ()
+putSearchResults = mapM_ (T.putStrLn . drawSearchResult)
 
 
 showThread :: String -> IO ()
