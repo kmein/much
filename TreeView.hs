@@ -32,7 +32,6 @@ import qualified Data.Map as M
 
 import Notmuch.Message
 import Notmuch.SearchResult
-import Safe
 
 
 type LineNr = Int
@@ -186,7 +185,7 @@ treeViewImage hasFocus = \case
         string sColor s
 
     TVSearchResult sr -> do
-        let ThreadID tid = searchThread sr
+        --let ThreadID tid = searchThread sr
         --string srColor tid
         -- <|>
         --translateX 1
@@ -254,6 +253,7 @@ treeViewImage hasFocus = \case
 
 
 
+padl :: Int -> a -> [a] -> [a]
 padl n c s =
     if length s < n
         then padl n c (c:s)
