@@ -119,7 +119,7 @@ main =
                 --string def (maybe "Nothing" describe (focusNext v c)) <->
                 treeImage (Just $ Z.label c) (Z.toTree c)
             pic = picForImage img
-            v = Z.root c
+            --v = Z.root c
         update vty pic
         nextEvent vty >>= \e -> case e of
             EvKey KUp [] ->
@@ -141,7 +141,7 @@ main =
 
                 let loc = c
                     Just sr = findParent isTVSearchResult loc
-                    Just sr0 = Z.firstChild sr -- TODO can there be only one (thread per sr)?
+                    --Just sr0 = Z.firstChild sr -- TODO can there be only one (thread per sr)?
                     TVSearchResult the_sr = Z.label sr
                     ThreadID tid = searchThread the_sr
 
@@ -165,6 +165,9 @@ main =
 
                 rec vty 0 $ Z.modifyTree (\(Node l _) -> Node l t_) loc
 
+            _ ->
+                -- TODO make some noise
+                rec vty (i + 1) c
 
 treeImage :: Maybe TreeView -> Tree TreeView -> Image
 --treeImage t_cur (Node n ns) =
