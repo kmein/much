@@ -103,7 +103,7 @@ main' query =
             }
 
     rec :: State -> IO ()
-    rec q@State{..} = do
+    rec q0@State{..} = do
         let
             img =
                 --string def (show i) <->
@@ -142,6 +142,9 @@ main' query =
             _ -> do
                 rec q { message = "unbound key: " ++ show e }
       where
+
+        q = q0 { message = "" }
+
         onEnter c_ = case Z.label c_ of
             TVMessage m -> do
                 toggleTag "open" m
