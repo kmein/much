@@ -13,7 +13,7 @@ import Graphics.Vty
 --import Data.Aeson
 --import Data.List.Split
 --import Data.Attoparsec.ByteString hiding (string)
---import Data.Maybe
+import Data.Maybe
 --import Data.Monoid
 --import Data.String
 --import Data.Traversable
@@ -46,27 +46,6 @@ import TreeSearch
 
 
 
-
-
---focusPrev t_cur t = do
---    i <- findIndex ((==t_cur) . messageId) msgs
---    m' <- msgs `atMay` (i - 1)
---    return $ messageId m'
---  where
---    msgs = flatten t
---
---focusNext t_cur t = do
---    i <- findIndex ((==t_cur) . messageId) msgs
---    m' <- msgs `atMay` (i + 1)
---    return $ messageId m'
---  where
---    msgs = flatten t
---
---focusMessage t_cur t = do
---    i <- findIndex ((==t_cur) . messageId) msgs
---    msgs `atMay` i
---  where
---    msgs = flatten t
 
 
 toggleTag :: T.Text -> Message -> IO ()
@@ -114,75 +93,77 @@ main =
         shutdown vty
 
     run vty = do
-        t_ <- getThread tid
-        let v = fromMessageTree t_
-        let c = findMessage (MessageID cid) v
-        rec vty 0 c v
+        --XXX show a single thread
+        --t_ <- getThread "0000000000000862"
+        --let v = fromMessageTree t_
+        --let c = findMessage (MessageID "87egtmvj0n.fsf@write-only.cryp.to") v
+        --rec vty 0 c v
 
-    tid = "0000000000000862"
-    cid = "87egtmvj0n.fsf@write-only.cryp.to"
+        let query = "tag:inbox AND NOT tag:killed"
+        Right r_ <- search query
+        let v = fromSearchResults query r_
+        rec vty 0 (Z.fromTree v)
 
     --rec vty t_cur t = do
-    rec :: Vty -> Int -> Maybe ThreadView -> Tree ThreadView -> IO ()
-    rec vty i c v = do
-        let --img = threadImage t_cur (fromMessageTree t)
+    --rec :: Vty -> Int -> Z.TreePos Z.Full ThreadView -> Tree ThreadView -> IO ()
+    rec :: Vty -> Int -> Z.TreePos Z.Full ThreadView -> IO ()
+    rec vty i c = do
+        let
             img =
-                (
-                  string def (show i)
-                  <|>
-                  translateX 1
-                    (
-                      string def (maybe "Nothing" describe c)
-                    )
-                )
-                <->
-                threadImage c v
+                --string def (show i) <->
+                --string def (maybe "Nothing" describe (focusPrev v c)) <->
+                --string def (maybe "Nothing" describe c) <->
+                --string def (maybe "Nothing" describe (focusNext v c)) <->
+                --string def (maybe "Nothing" describe (focusPrev v c)) <->
+                --string def (describe $ Z.label c) <->
+                --string def (maybe "Nothing" describe (focusNext v c)) <->
+                threadImage (Just $ Z.label c) (Z.toTree c)
             pic = picForImage img
+            v = Z.root c
         update vty pic
         nextEvent vty >>= \e -> case e of
             EvKey KUp [] ->
-                --case focusPrev t t_cur of
-                --case focusPrev v c of
-                --    Just t_prev ->
-                --        --rec vty t_prev t
-                --        rec vty (i + 1) t_prev v
-                --    Nothing ->
-                --        --rec vty t_cur t
-                --        rec vty (i + 1) c v
-                rec vty (i + 1) (focusPrev v c) v
+                rec vty (i + 1) (fromMaybe (Z.root c) $ findPrev c)
             EvKey KDown [] ->
-                --case focusNext t t_cur of
-                --case focusNext v c of
-                --    Just t_next ->
-                --        --rec vty t_next t
-                --        rec vty (i + 1) t_next v
-                --    Nothing ->
-                --        --rec vty t_cur t
-                --        rec vty (i + 1) c v
-                rec vty (i + 1) (focusNext v c) v
+                rec vty (i + 1) (fromMaybe (Z.root c) $ findNext c)
             EvKey KEnter [] ->
-                case c of
-                    Nothing -> error "no cursor"
-                    Just c_ -> do
-                        --toggleTag "open" t_cur t
-                        toggleTag "open" c_
-                        t'_ <- getThread tid
-                        let v' = fromMessageTree t'_
-                        let c' = findTV c_ v'
-                        if c' == Nothing
-                            then error $ "couldn't find" ++ show (c_, v')
-                            else return ()
-                        --rec vty t_cur t'
-                        rec vty (i + 1) c' v'
+                onEnter c
 
             EvResize _w _h ->
-                --rec vty t_cur t
-                rec vty (i + 1) c v
+                rec vty (i + 1) c
 
             _ -> do
                 print $ "Last event was: " ++ show e
+      where
+        onEnter c_ = case Z.label c_ of
+            TVMessage m -> do
+                toggleTag "open" m
 
+                let loc = c
+                    Just sr = findParent isTVSearchResult loc
+                    Just sr0 = Z.firstChild sr -- TODO can there be only one (thread per sr)?
+                    TVSearchResult the_sr = Z.label sr
+                    ThreadID tid = searchThread the_sr
 
+                t_ <- return . (:[]) . fromMessageTree =<< getThread tid
+
+                rec vty 0 $ fromMaybe (error "couldn't reselect")
+                          $ findTree (==Z.label c)
+                          $ Z.modifyTree (\(Node l _) -> Node l t_) sr
+
+            TVSearchResult sr -> do
+                --let Just loc = findTree (==c_) $ Z.fromTree v
+                let loc = c
+
+                let open = not $ null $ subForest $ Z.tree loc
+                let ThreadID tid = searchThread sr
+
+                t_ <-
+                    if open
+                        then return []
+                        else return . (:[]) . fromMessageTree =<< getThread tid
+
+                rec vty 0 $ Z.modifyTree (\(Node l _) -> Node l t_) loc
 
 
 threadImage :: Maybe ThreadView -> Tree ThreadView -> Image

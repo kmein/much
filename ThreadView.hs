@@ -64,29 +64,17 @@ instance Eq ThreadView where
     _ == _ = False
 
 
+isTVSearchResult :: ThreadView -> Bool
+isTVSearchResult (TVSearchResult _) = True
+isTVSearchResult _ = False
+
+
 describe :: ThreadView -> String
 describe (TVMessage m) = "TVMessage " <> unMessageID (messageId m)
 describe (TVMessagePart m p) = "TVMessagePart " <> (unMessageID $ messageId m) <> " " <> show (partID p)
 describe (TVMessageLine _ _ _ s) = "TVMessageLine " <> show s
 describe (TVSearch s) = "TVSearch " <> show s
 describe (TVSearchResult sr) = "TVSearchResult " <> show (searchTotal sr)
-
-
-focusPrev :: Tree ThreadView -> Maybe ThreadView -> Maybe ThreadView
-focusPrev v Nothing = lastMay (flatten v)
-focusPrev v (Just cur) = do
-    i <- elemIndex cur items
-    maybe (lastMay items) Just $ atMay items (i - 1)
-  where
-    items = flatten v
-
-focusNext :: Tree ThreadView -> Maybe ThreadView -> Maybe ThreadView
-focusNext v Nothing = headMay (flatten v)
-focusNext v (Just cur) = do
-    i <- elemIndex cur items
-    maybe (headMay items) Just $ atMay items (i + 1)
-  where
-    items = flatten v
 
 
 findMessage :: MessageID -> Tree ThreadView -> Maybe ThreadView
