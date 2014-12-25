@@ -73,9 +73,12 @@ untagMessage tag m =
   unsetTag (T.unpack tag) (unMessageID $ messageId m)
 
 
-
 main :: IO ()
 main =
+    main' "tag:inbox AND NOT tag:killed"
+
+main' :: String -> IO ()
+main' query =
     bracket (mkVty def) finit run
   where
 
@@ -89,7 +92,6 @@ main =
         --let c = findMessage (MessageID "87egtmvj0n.fsf@write-only.cryp.to") v
         --rec vty 0 c v
 
-        let query = "tag:inbox AND NOT tag:killed"
         Right r_ <- search query
         rec State
             { vty = vty0
