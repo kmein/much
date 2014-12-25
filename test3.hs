@@ -121,6 +121,9 @@ main' query =
             --v = Z.root cursor
         update vty pic
         nextEvent vty >>= \e -> case e of
+            EvKey KEsc [] ->
+                rec q
+
             EvKey (KChar 'c') [MCtrl] ->
                 error "^C"
 
