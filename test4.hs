@@ -110,11 +110,16 @@ redraw _q@State{..} = do
     -- consumes 1 screenHeight
     putStr $ "\ESC[2K" ++ flashMessage ++ " " ++ show (screenWidth, screenHeight)
 
+
+    let buf = map (take screenWidth . drop xoffset) $
+              take (screenHeight - 1) $
+              drop yoffset $
+              renderTreeView (Z.label cursor) (Z.toTree cursor)
+
     mapM_ (putStr . ("\n\ESC[2K"++)) $
-        map (take screenWidth . drop xoffset) $
-        take (screenHeight - 1) $
-        drop yoffset $
-        renderTreeView (Z.label cursor) (Z.toTree cursor)
+        buf
+        ++
+        take (screenHeight - 1 - length buf) (repeat "~")
 
 
 
