@@ -9,7 +9,7 @@ let
   ];
 
   extraCmds = with pkgs; ''
-    export HISTFILE="\$HOME/.history/env-${name}"
+    export MANPATH=$(ls -d $(echo "$PATH" | tr : \\n | sed -n 's:\(^/nix/store/[^/]\+\).*:\1/share/man:p') 2>/dev/null | tr \\n :)
     $(grep export ${hsEnv.outPath}/bin/ghc)
     ${mkExports staticPkgs}
   '';
