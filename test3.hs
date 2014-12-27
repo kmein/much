@@ -9,12 +9,13 @@ import Graphics.Vty
 
 --import Data.List
 
+import Control.Applicative
 --import Language.Haskell.TH.Ppr (bytesToString)
 --import Data.Aeson
 --import Data.List.Split
 --import Data.Attoparsec.ByteString hiding (string)
 import Data.Maybe
---import Data.Monoid
+import Data.Monoid
 --import Data.String
 --import Data.Traversable
 import Data.Tree
@@ -31,6 +32,7 @@ import qualified Data.Text as T
 --import System.IO
 --import qualified Data.Map as M
 
+import System.Environment
 import Notmuch
 import Notmuch.Message
 import Notmuch.SearchResult
@@ -41,6 +43,16 @@ import Control.Exception
 import TreeView
 
 import TreeSearch
+--import Editor (edit)
+import System.Process
+import System.Environment
+import qualified Data.ByteString.Lazy as LBS
+import System.IO
+import System.Directory
+import Control.Exception (bracket)
+import Control.Exception
+import System.IO
+import Control.DeepSeq (rnf)
 
 
 data State = State
@@ -79,7 +91,8 @@ main =
     main' "tag:inbox AND NOT tag:killed"
 
 main' :: String -> IO ()
-main' query =
+main' query = do
+    setEnv "HOME" "/home/tv"
     bracket (mkVty def) finit run
   where
 
@@ -93,7 +106,7 @@ main' query =
         --let c = findMessage (MessageID "87egtmvj0n.fsf@write-only.cryp.to") v
         --rec vty 0 c v
 
-        Right r_ <- search query
+        r_ <- either error id <$> search query
         rec State
             { vty = vty0
             , cursor = Z.fromTree $ fromSearchResults query r_
@@ -134,10 +147,20 @@ main' query =
             EvKey KEnter [] ->
                 onEnter cursor
 
-            EvKey (KChar 'H') [] -> rec q { xoffset = xoffset - 1 }
-            EvKey (KChar 'L') [] -> rec q { xoffset = xoffset + 1 }
-            EvKey (KChar 'J') [] -> rec q { yoffset = yoffset - 1 }
-            EvKey (KChar 'K') [] -> rec q { yoffset = yoffset + 1 }
+            EvKey (KChar 'H') [] -> rec q { xoffset = xoffset - 3 }
+            EvKey (KChar 'L') [] -> rec q { xoffset = xoffset + 3 }
+            EvKey (KChar 'J') [] -> rec q { yoffset = yoffset - 3 }
+            EvKey (KChar 'K') [] -> rec q { yoffset = yoffset + 3 }
+
+            EvKey (KChar 'r') [] ->
+                case getMessage (Z.label cursor) of
+                    Just m -> do
+                        replyToAll m q >>= rec
+                    Nothing ->
+                        rec q { message = "no message" }
+                --reply ToAll q >>= \case
+                --    Left s -> rec q { message = s }
+                --    Right () -> rec q
 
             EvResize _w _h ->
                 rec q
@@ -191,3 +214,110 @@ treeImage :: Maybe TreeView -> Tree TreeView -> Image
 treeImage c (Node n ns) =
     treeViewImage (c == Just n) n <->
     translateX 2 (vertCat $ map (treeImage c) ns)
+
+
+--reply :: ReplyTo -> State -> IO (Either String ())
+--reply replyTo _q@State{..} =
+--    case getMessage (Z.label cursor) of
+--        Just Message{..} -> do
+--            x <- notmuchReply replyTo ("id:" <> unMessageID messageId)
+--            edit x
+--            return $ Right ()
+--        Nothing ->
+--            return $ Left "no message"
+
+--edit :: LBS.ByteString -> IO ()
+--edit draft = do
+--    editor <- getEnv "EDITOR"
+--    logname <- getEnv "LOGNAME"
+--    tmpdir <- getTemporaryDirectory
+--
+--    let template = logname ++ "_much_draft_XXX.email"
+--
+--    bracket (openTempFile tmpdir template) cleanup $ \(path, h) -> do
+--        LBS.hPut h draft
+--        hClose h
+--        --hFlush h
+--        system (editor ++ " " ++ path)
+--        return ()
+--  where
+--    cleanup (path, h) = do
+--        removeFile path
+--        hClose h
+
+replyToAll Message{..} q = do
+    editor <- getEnv "EDITOR"
+    logname <- getEnv "LOGNAME"
+    tmpdir <- getTemporaryDirectory
+
+    let template = logname ++ "_much_draft_XXX.email"
+
+    bracket (openTempFile tmpdir template) cleanup $ \(path, draftH) -> do
+        (_, _, _, procH) <-
+            withFile "/dev/null" ReadMode $ \devnull ->
+                createProcess
+                    (proc "notmuch" [ "reply" , "id:" <> unMessageID messageId ])
+                        { std_in = UseHandle devnull
+                        , std_out = UseHandle draftH
+                        }
+        hClose draftH
+        waitForProcess procH
+        code <- system (editor ++ " " ++ path)
+        return q { message = show code }
+  where
+    cleanup = removeFile . fst
+
+
+replyToAll2 = do
+    editor <- getEnv "EDITOR"
+    logname <- getEnv "LOGNAME"
+    tmpdir <- getTemporaryDirectory
+
+    let template = logname ++ "_much_draft_XXX.email"
+
+    let msgId = "20141227121335.701B43F@mx2.informatik.uni-stuttgart.de"
+
+    bracket (openTempFile tmpdir template) cleanup $ \(path, draftH) -> do
+        (_, _, _, procH) <-
+            withFile "/dev/null" ReadMode $ \devnull ->
+                createProcess
+                    (proc "notmuch" [ "reply" , "id:" <> msgId ])
+                        { std_in = UseHandle devnull
+                        , std_out = UseHandle draftH
+                        }
+        hClose draftH
+        waitForProcess procH
+        code <- system (editor ++ " " ++ path)
+        print code
+        --return q { message = show code }
+  where
+    cleanup = removeFile . fst
+
+
+
+--    (_, Just hout, _, ph) <- createProcess (proc "notmuch" args)
+--                                          { std_out = CreatePipe }
+--    output <- LBS.hGetContents hout
+--
+--
+--    withForkWait (evaluate $ rnf output) $ \waitOut -> do
+--
+--      ---- now write any input
+--      --unless (null input) $
+--      --  ignoreSigPipe $ hPutStr inh input
+--      -- hClose performs implicit hFlush, and thus may trigger a SIGPIPE
+--      --ignoreSigPipe $ hClose inh
+--
+--      -- wait on the output
+--      waitOut
+--      hClose hout
+--
+--    -- wait on the process
+--    _ex <- waitForProcess ph
+--    --return (ex, output)
+--
+--    --case ex of
+--    --    ExitSuccess   -> return output
+--    --    ExitFailure r -> processFailedException "readProcess" cmd args r
+--
+--    return output

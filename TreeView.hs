@@ -68,6 +68,15 @@ instance Eq TreeView where
     _ == _ = False
 
 
+getMessage :: TreeView -> Maybe Message
+getMessage = \case
+    TVMessage m -> Just m
+    TVMessageHeaderField m _ -> Just m
+    TVMessagePart m _ -> Just m
+    TVMessageLine m _ _ _ -> Just m
+    _ -> Nothing
+
+
 isTVSearchResult :: TreeView -> Bool
 isTVSearchResult (TVSearchResult _) = True
 isTVSearchResult _ = False
@@ -206,6 +215,10 @@ treeViewImage hasFocus = \case
         -- (string srColor $ show $ searchTime sr)
         <|>
         (string srColor $ T.unpack $ searchSubject sr)
+        <|>
+        --(string srColor $ T.unpack $ searchThread sr)
+        (translateX 1 $ let ThreadID tid = searchThread sr in string srColor tid)
+        --string srColor tid
   where
     --c1 = if hasFocus then c1_focus else c1_nofocus
     --c1_nofocus = withForeColor def $ Color240 $ -16 + 238

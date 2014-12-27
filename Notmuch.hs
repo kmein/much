@@ -95,6 +95,22 @@ search term =
         >>= return . eitherDecode'
 
 
+data ReplyTo = ToAll | ToSender
+instance Show ReplyTo where
+    show ToAll = "all"
+    show ToSender = "sender"
+
+--notmuchReply :: String -> IO (Either String [SearchResult])
+notmuchReply :: ReplyTo -> String -> IO LBS.ByteString
+notmuchReply replyTo term =
+    notmuch
+        [ "reply"
+        , "--reply-to=" ++ show replyTo
+        , term
+        ]
+ --       >>= return . eitherDecode'
+
+
 putSearchResults :: [SearchResult] -> IO ()
 putSearchResults = mapM_ (T.putStrLn . drawSearchResult)
 
