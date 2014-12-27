@@ -136,12 +136,14 @@ keymap "r" = Just replyToAll
 keymap "e" = Just viewSource
 keymap "k" = Just moveCursorUp
 keymap "j" = Just moveCursorDown
-keymap "K" = Just moveTreeDown
-keymap "J" = Just moveTreeUp
+keymap "K" = Just $ moveTreeDown 1
+keymap "J" = Just $ moveTreeUp 1
 keymap "\ESC[A" = Just moveCursorUp
 keymap "\ESC[B" = Just moveCursorDown
-keymap "\ESC[a" = Just moveTreeDown
-keymap "\ESC[b" = Just moveTreeUp
+keymap "\ESC[a" = Just $ moveTreeDown 1
+keymap "\ESC[b" = Just $ moveTreeUp 1
+keymap "\ESC[5~" = Just $ \q -> moveTreeDown (screenHeight q `div` 2) q   -- PgUp
+keymap "\ESC[6~" = Just $ \q -> moveTreeUp (screenHeight q `div` 2) q -- PgDn
 keymap "\n" = Just toggleFold
 
 keymap ('\ESC':'[':'9':';':xs) = Just $ \q@State{..} -> do
@@ -156,11 +158,11 @@ moveCursorDown q@State{..} =
 moveCursorUp q@State{..} =
     return q { cursor = fromMaybe (Z.root cursor) $ findPrev cursor }
 
-moveTreeUp q@State{..} =
-    return q { yoffset = max 0 (yoffset + 1) }
+moveTreeUp n q@State{..} =
+    return q { yoffset = max 0 (yoffset + n) }
 
-moveTreeDown q@State{..} =
-    return q { yoffset = max 0 (yoffset - 1) }
+moveTreeDown n q@State{..} =
+    return q { yoffset = max 0 (yoffset - n) }
 
 
 toggleFold q@State{..} = case Z.label cursor of
