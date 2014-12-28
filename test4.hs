@@ -168,13 +168,18 @@ keymap _ = Nothing
 
 
 
+topOverrun :: State -> Int
 topOverrun State{..} =
     max 0 (- (linearPos cursor - yoffset))
 
+
+botOverrun :: State -> Int
 botOverrun State{..} =
     max 0 (linearPos cursor - yoffset - (screenHeight - (length headBuffer) - 1))
 
 
+
+moveCursorDown :: Monad m => Int -> State -> m State
 moveCursorDown n q@State{..} =
     let cursor' = findNextN n cursor
         q' = q { cursor = cursor' }
@@ -183,6 +188,7 @@ moveCursorDown n q@State{..} =
         i -> moveTreeUp i q'
 
 
+moveCursorUp :: Monad m => Int -> State -> m State
 moveCursorUp n q@State{..} =
     let cursor' = findPrevN n cursor
         q' = q { cursor = cursor' }
@@ -191,6 +197,7 @@ moveCursorUp n q@State{..} =
         i -> moveTreeDown i q'
 
 
+moveTreeUp :: Monad m => Int -> State -> m State
 moveTreeUp n q@State{..} =
     let q' = q { yoffset = min (length treeBuffer - 1) $ max 0 (yoffset + n) }
     in case topOverrun q' of
@@ -198,6 +205,7 @@ moveTreeUp n q@State{..} =
         i -> moveCursorDown i q'
 
 
+moveTreeDown :: Monad m => Int -> State -> m State
 moveTreeDown n q@State{..} =
     let q' = q { yoffset = min (length treeBuffer - 1) $ max 0 (yoffset - n) }
     in case botOverrun q' of
@@ -205,6 +213,8 @@ moveTreeDown n q@State{..} =
         i -> moveCursorUp i q'
 
 
+
+toggleFold :: State -> IO State
 toggleFold q@State{..} = case Z.label cursor of
     TVMessage m -> do
         toggleTag (T.pack "open") m
@@ -249,6 +259,7 @@ toggleFold q@State{..} = case Z.label cursor of
 
 
 
+replyToAll :: State -> IO State
 replyToAll q@State{..} = case getMessage (Z.label cursor) of
     Nothing ->
         return q { flashMessage = "no message" }
@@ -283,6 +294,7 @@ replyToAll q@State{..} = case getMessage (Z.label cursor) of
         return q
 
 
+viewSource :: State -> IO State
 viewSource q@State{..} = case getMessage (Z.label cursor) of
     Nothing ->
         return q { flashMessage = "no message" }
