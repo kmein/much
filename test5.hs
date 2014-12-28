@@ -83,8 +83,8 @@ cleanup = do
 startup :: IO ()
 startup = do
 
-    setEnv "HOME" =<< getEnv "OLDHOME"
-
+    -- load-env hack
+    maybe (return ()) (setEnv "HOME") =<< lookupEnv "OLDHOME"
 
     hSetEcho stdin False
     hSetBuffering stdin NoBuffering

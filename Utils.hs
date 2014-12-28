@@ -14,3 +14,10 @@ withTempFile tmpdir template =
 mintercalate :: Monoid b => b -> [b] -> b
 mintercalate c (h:t) = foldl (\acc x -> acc <> c <> x) h t
 mintercalate _ [] = mempty
+
+
+padl :: Int -> a -> [a] -> [a]
+padl n c s =
+    if length s < n
+        then padl n c (c:s)
+        else s
