@@ -31,6 +31,7 @@ let
       process
       rosezipper
       safe
+      terminalSize
     ]
   );
 
