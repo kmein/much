@@ -1,23 +1,19 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Scanner where
 
-import Control.Monad (forever)
-import System.IO
-
-import Data.Ord
-import Data.Bits
-import Data.Char
+module Scanner
+    ( getKey
+    ) where
 
 import Prelude hiding ((/))
-
 import Control.Applicative
 import Control.Monad.Error
 import Control.Monad.State
 import Control.Monad.Writer
-
-import Data.Time.Clock
+import Data.Bits
+import Data.Char
+import System.IO
 
 
 -- high level interface
@@ -32,20 +28,26 @@ type P = C
 type I = C
 type F = C
 
+
 data Token
     = CS [P] [I] F
     | Chr C
   deriving (Show)
 
+
 type ScanLog = [C]
+
 
 type ScanError = String
 
+
 data ScanState = ScanState
-    { result :: Maybe Token
+    { _result :: Maybe Token -- TODO underscore supresses warning, rename before usage..
     , buffer :: [C]
     }
 
+
+emptyScanState :: ScanState
 emptyScanState = ScanState Nothing []
 
 
@@ -61,34 +63,15 @@ newtype Scanner m a = Scanner
     , MonadWriter ScanLog
     )
 
+
 runScanner :: Scanner m a -> m ((Either ScanError a, ScanLog), ScanState)
 runScanner (Scanner a) =
     runStateT (runWriterT (runErrorT a)) emptyScanState
 
 
 -- TODO max timeout
+timeout :: Int
 timeout = 1
-
-
-main :: IO ()
-main = do
-    hSetEcho stdin False
-    hSetBuffering stdin NoBuffering
-    forever $ do
-
-        _ <- hLookAhead stdin -- wait for input
-
-        t0 <- getCurrentTime
-        ((res, s), _) <- runScanner scan
-        t1 <- getCurrentTime
-
-        putStrLn $ "====> \ESC[32;1m" ++ show s ++ "\ESC[m in " ++
-                    (show $ diffUTCTime t1 t0)
-                    ++ ": \"\ESC[35m" ++ (s >>= colorize . toChar)
-                    ++ "\ESC[m\""
-        case res of
-            Left msg -> putStrLn $ "  error: " ++ msg
-            Right _ -> return ()
 
 
 scan, scanESC, scanCS ::
@@ -184,11 +167,13 @@ whenJust mb f =
 
 
 
-
+(/) :: Int -> Int -> C
 c / r = C c r
+
 
 data C = C { column :: Int, row :: Int }
     deriving (Eq)
+
 
 instance Show C where
   show C{..} = 
@@ -212,55 +197,33 @@ fromChar c = let i = ord c in C ((shift i (-4)) .&. 0xf) (i .&. 0xf)
 toChar :: C -> Char
 toChar (C col row) = chr $ (shift col 4) .|. row
 
-
-
-
-
-colorize :: Char -> String
-colorize c
-  | isPrint c = [c]
-  | otherwise = "\ESC[1m" ++ (showLitChar c "") ++ "\ESC[22m"
-
-
-
-
 
 --
+
+
+hGetC :: Handle -> IO C
+hGetC h = hGetChar h >>= return . fromChar
+
+
+hWaitGetChar :: Int -> Handle -> IO (Maybe Char)
 hWaitGetChar t h = do
     ready <- hWaitForInput h t
     if ready
         then hGetChar h >>= return . Just
         else return Nothing
 
-hGetC h = hGetChar h >>= return . fromChar
+
+hWaitGetC :: Int -> Handle -> IO (Maybe C)
 hWaitGetC t h = do
     mb_ch <- hWaitGetChar t h
     case mb_ch of
         Nothing -> return Nothing
         Just ch -> return $ Just $ fromChar $ ch
 
+
+hWaitLookAheadC :: Int -> Handle -> IO (Maybe C)
 hWaitLookAheadC t h = do
     ready <- hWaitForInput h t
     if ready
         then hLookAhead h >>= return . Just . fromChar
         else return Nothing
-
-
--- CRUFT
---expect cx ca =
---    when (cx /= ca) $ 
---        throwError $ "expected: " ++ (show cx) ++ ", got: " ++ (show ca)
---
---
---
---    expect (01/11) c
---
---    c <- (liftIO getChar) >>= return . fromChar
---
---    tell [c]
---
---    expect (05/11) c
-
-    --liftIO $ putStrLn $ (show c) ++ " -> " ++ (show s)
-
-

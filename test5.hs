@@ -17,7 +17,7 @@ import Control.Exception
 import Control.Monad
 import Data.Maybe
 import Data.Monoid
-import Scanner (scan, runScanner, toChar)
+import Scanner (getKey)
 import System.Directory
 import System.Environment
 import System.Exit
@@ -136,9 +136,7 @@ winchHandler putEvent =
 inputHandler :: (Event -> IO ()) -> IO ()
 inputHandler putEvent = forever $ do
     -- TODO make stdin configurable
-    _ <- hLookAhead stdin
-    ((_, s), _) <- runScanner scan
-    putEvent $ EKey $ map toChar s
+    getKey >>= putEvent . EKey
 
 
 run :: IO Event -> State -> IO ()
