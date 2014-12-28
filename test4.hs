@@ -2,7 +2,6 @@
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Applicative
-import Control.Concurrent
 import Control.Exception
 import Data.Maybe
 import Scanner (scan, runScanner, toChar)
@@ -33,6 +32,8 @@ data State = State
     , flashMessage :: String
     , screenWidth :: Int
     , screenHeight :: Int
+    , headBuffer :: [String]
+    , treeBuffer :: [String]
     }
 
 
@@ -64,8 +65,6 @@ initState = do
               hPutStr stdout "\ESC[?1049h"
               -- Hide Cursor
               hPutStr stdout "\ESC[?25l"
-              -- Move the cursor to the home position
-              hPutStr stdout "\ESC[H"
               hFlush stdout
         , discharge = do
               _ <- installHandler 28 Default Nothing
@@ -80,11 +79,14 @@ initState = do
         , flashMessage = "Welcome to much; quit with ^C"
         , screenWidth = 0
         , screenHeight = 0
+        , headBuffer = []
+        , treeBuffer = []
         }
 
 
 run :: State -> IO ()
-run q = do
+run q0 = do
+    let q = render q0
 
     redraw q
 
@@ -98,28 +100,42 @@ run q = do
             run q { flashMessage = show $ map toChar s }
 
 
+render :: State -> State
+render q@State{..} =
+    q { treeBuffer = newTreeBuf
+      , headBuffer = newHeadBuf
+      }
+  where
+    newTreeBuf = renderTreeView (Z.label cursor) (Z.toTree cursor)
+    newHeadBuf =
+        [ show screenWidth ++ "x" ++ show screenHeight
+          --show (linearPos cursor + 1) ++ "/" ++ show (length uncut)
+          ++ " " ++ show (linearPos cursor - yoffset)
+          ++ " " ++ show (topOverrun q)
+          ++ " " ++ show (botOverrun q)
+          ++ " " ++ flashMessage
+        , "--"
+        , "--"
+        , "--"
+        ]
+
+
+
 redraw :: State -> IO ()
 redraw _q@State{..} = do
 
-    --putStrLn $ describe (Z.label cursor)
-    --putStr "\ESC[?2J"
-    putStr "\ESC[H"
-    --mapM_ putStr $ take screenHeight $ repeat "\ESC[2K\n"
-    --putStr "\ESC[H"
+    let image =
+            map (take screenWidth . drop xoffset) $
+            take screenHeight $
+            headBuffer ++ drop yoffset treeBuffer
+        screen =
+            image ++ take (screenHeight - length image) (repeat "~")
 
-    -- consumes 1 screenHeight
-    putStr $ "\ESC[2K" ++ flashMessage ++ " " ++ show (screenWidth, screenHeight)
-
-
-    let buf = map (take screenWidth . drop xoffset) $
-              take (screenHeight - 1) $
-              drop yoffset $
-              renderTreeView (Z.label cursor) (Z.toTree cursor)
-
-    mapM_ (putStr . ("\n\ESC[2K"++)) $
-        buf
-        ++
-        take (screenHeight - 1 - length buf) (repeat "~")
+    case map (++"\ESC[K") screen of
+      (first : rest) ->
+          putStr $ "\ESC[H" ++ first ++ concatMap ("\n"++) rest
+      _ ->
+          return ()
 
 
 
@@ -134,12 +150,12 @@ keymap :: String -> Maybe (State -> IO State)
 
 keymap "r" = Just replyToAll
 keymap "e" = Just viewSource
-keymap "k" = Just moveCursorUp
-keymap "j" = Just moveCursorDown
+keymap "k" = Just $ moveCursorUp 1
+keymap "j" = Just $ moveCursorDown 1
 keymap "K" = Just $ moveTreeDown 1
 keymap "J" = Just $ moveTreeUp 1
-keymap "\ESC[A" = Just moveCursorUp
-keymap "\ESC[B" = Just moveCursorDown
+keymap "\ESC[A" = Just $ moveCursorUp 1
+keymap "\ESC[B" = Just $ moveCursorDown 1
 keymap "\ESC[a" = Just $ moveTreeDown 1
 keymap "\ESC[b" = Just $ moveTreeUp 1
 keymap "\ESC[5~" = Just $ \q -> moveTreeDown (screenHeight q `div` 2) q   -- PgUp
@@ -152,17 +168,42 @@ keymap ('\ESC':'[':'9':';':xs) = Just $ \q@State{..} -> do
 keymap _ = Nothing
 
 
-moveCursorDown q@State{..} =
-    return q { cursor = fromMaybe (Z.root cursor) $ findNext cursor }
 
-moveCursorUp q@State{..} =
-    return q { cursor = fromMaybe (Z.root cursor) $ findPrev cursor }
+topOverrun State{..} =
+    max 0 (- (linearPos cursor - yoffset))
+
+botOverrun State{..} =
+    max 0 (linearPos cursor - yoffset - (screenHeight - (length headBuffer) - 1))
+
+
+moveCursorDown n q@State{..} =
+    let cursor' = findNextN n cursor
+        q' = q { cursor = cursor' }
+    in case botOverrun q' of
+        0 -> return q'
+        i -> moveTreeUp i q'
+
+
+moveCursorUp n q@State{..} =
+    let cursor' = findPrevN n cursor
+        q' = q { cursor = cursor' }
+    in case topOverrun q' of
+        0 -> return q'
+        i -> moveTreeDown i q'
+
 
 moveTreeUp n q@State{..} =
-    return q { yoffset = max 0 (yoffset + n) }
+    let q' = q { yoffset = min (length treeBuffer - 1) $ max 0 (yoffset + n) }
+    in case topOverrun q' of
+        0 -> return q'
+        i -> moveCursorDown i q'
+
 
 moveTreeDown n q@State{..} =
-    return q { yoffset = max 0 (yoffset - n) }
+    let q' = q { yoffset = min (length treeBuffer - 1) $ max 0 (yoffset - n) }
+    in case botOverrun q' of
+        0 -> return q'
+        i -> moveCursorUp i q'
 
 
 toggleFold q@State{..} = case Z.label cursor of

@@ -2,6 +2,7 @@ module TreeSearch where
 
 import Data.Tree.Zipper
 
+
 findTree :: (a -> Bool) -> TreePos Full a -> Maybe (TreePos Full a)
 findTree p loc = if p (label loc)
     then Just loc
@@ -41,8 +42,33 @@ findPrev loc =
             Just x' -> trans_lastChild x'
 
 
+
+findNextN :: Int -> TreePos Full a -> TreePos Full a
+findNextN n loc
+    | n <= 0 = loc
+    | otherwise =
+        maybe loc (findNextN $ n - 1) (findNext loc)
+
+
+findPrevN :: Int -> TreePos Full a -> TreePos Full a
+findPrevN n loc
+    | n <= 0 = loc
+    | otherwise =
+        maybe loc (findPrevN $ n - 1) (findPrev loc)
+
+
+
 findParent :: (a -> Bool) -> TreePos Full a -> Maybe (TreePos Full a)
 findParent p loc =
     if p (label loc)
         then Just loc
         else parent loc >>= findParent p
+
+
+linearPos :: TreePos Full a -> Int
+linearPos =
+    rec 0
+  where
+    rec i loc = case findPrev loc of
+        Just loc' -> rec (i + 1) loc'
+        Nothing -> i
