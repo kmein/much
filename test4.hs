@@ -124,6 +124,7 @@ redraw :: State -> IO ()
 redraw _q@State{..} = do
 
     let image =
+            map (fmap $ fmap $ sub '\t' ' ') $
             map (trammelTake screenWidth . trammelDrop xoffset) $
             take screenHeight $
             headBuffer ++ drop yoffset treeBuffer
@@ -135,6 +136,8 @@ redraw _q@State{..} = do
           putStr $ pp $ "\ESC[H" <> first <> mconcat (map ("\n"<>) rest)
       _ ->
           return ()
+  where
+    sub x x' c = if c == x then x' else c
 
 
 

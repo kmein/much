@@ -24,6 +24,14 @@ data Trammel a
   deriving (Eq, Show)
 
 
+instance Functor Trammel where
+    fmap f = \case
+        Append t1 t2 -> Append (fmap f t1) (fmap f t2)
+        Plain s -> Plain (f s)
+        SGR pm t -> SGR pm (fmap f t)
+        Empty -> Empty
+
+
 instance Monoid (Trammel a) where
     mappend = Append
     mempty = Empty
