@@ -1,9 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Applicative
 import Control.Exception
 import Data.Maybe
+import Data.Monoid
 import Scanner (scan, runScanner, toChar)
 import System.Directory
 import System.Environment
@@ -12,6 +14,7 @@ import System.IO
 import System.Posix.Files
 import System.Posix.Signals
 import System.Process
+import Trammel
 import TreeSearch
 import TreeView
 import TreeViewRaw
@@ -32,8 +35,8 @@ data State = State
     , flashMessage :: String
     , screenWidth :: Int
     , screenHeight :: Int
-    , headBuffer :: [String]
-    , treeBuffer :: [String]
+    , headBuffer :: [Trammel String]
+    , treeBuffer :: [Trammel String]
     }
 
 
@@ -108,15 +111,11 @@ render q@State{..} =
   where
     newTreeBuf = renderTreeView (Z.label cursor) (Z.toTree cursor)
     newHeadBuf =
-        [ show screenWidth ++ "x" ++ show screenHeight
-          --show (linearPos cursor + 1) ++ "/" ++ show (length uncut)
-          ++ " " ++ show (linearPos cursor - yoffset)
-          ++ " " ++ show (topOverrun q)
-          ++ " " ++ show (botOverrun q)
-          ++ " " ++ flashMessage
-        , "--"
-        , "--"
-        , "--"
+        [ Plain (show screenWidth) <> "x" <> Plain (show screenHeight)
+          <> " " <> Plain (show $ linearPos cursor - yoffset)
+          <> " " <> Plain (show $ topOverrun q)
+          <> " " <> Plain (show $ botOverrun q)
+          <> " " <> Plain flashMessage
         ]
 
 
@@ -125,15 +124,15 @@ redraw :: State -> IO ()
 redraw _q@State{..} = do
 
     let image =
-            map (take screenWidth . drop xoffset) $
+            map (trammelTake screenWidth . trammelDrop xoffset) $
             take screenHeight $
             headBuffer ++ drop yoffset treeBuffer
         screen =
             image ++ take (screenHeight - length image) (repeat "~")
 
-    case map (++"\ESC[K") screen of
+    case map (<>"\ESC[K") screen of
       (first : rest) ->
-          putStr $ "\ESC[H" ++ first ++ concatMap ("\n"++) rest
+          putStr $ pp $ "\ESC[H" <> first <> mconcat (map ("\n"<>) rest)
       _ ->
           return ()
 

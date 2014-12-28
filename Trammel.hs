@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 module Trammel where
 
 import Control.Applicative
@@ -214,3 +215,33 @@ pp t = renderString emptyRenderState t ""
 renderSGR :: Pm -> String
 renderSGR [] = []
 renderSGR xs = ("\ESC["++) . (++"m") . intercalate ";" $ map show xs
+
+
+trammelDrop :: Int -> Trammel String -> Trammel String
+trammelDrop n = \case
+    Append t1 t2 ->
+        case compare n (len t1) of
+            LT -> Append (trammelDrop n t1) t2
+            EQ -> t2
+            GT -> trammelDrop (n - len t1) t2
+    Plain s ->
+        Plain (drop n s)
+    SGR pm t ->
+        SGR pm (trammelDrop n t)
+    Empty ->
+        Empty
+
+
+trammelTake :: Int -> Trammel String -> Trammel String
+trammelTake n = \case
+    Append t1 t2 ->
+        case compare n (len t1) of
+            LT -> trammelTake n t1
+            EQ -> t1
+            GT -> Append t1 (trammelTake (n - len t1) t2)
+    Plain s ->
+        Plain (take n s)
+    SGR pm t ->
+        SGR pm (trammelTake n t)
+    Empty ->
+        Empty

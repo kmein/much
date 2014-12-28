@@ -1,7 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module TreeViewRaw where
 
+import Data.Monoid
 import TreeView
 import Data.Tree
 import Trammel
@@ -13,20 +15,17 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Text as T
 
--- Maybe TreeView -> Tree TreeView -> Image
---hPutTreeView h cur tv =
---                treeImage (Just $ Z.label cursor) (Z.toTree cursor)
 
-renderTreeView :: TreeView -> Tree TreeView -> [String]
+renderTreeView :: TreeView -> Tree TreeView -> [Trammel String]
 renderTreeView cur _loc@(Node label children) =
     [ colorize $ renderTreeView1 hasFocus label ] ++
-    concatMap (map ("  "++) . renderTreeView cur) children
+    concatMap (map ("  "<>) . renderTreeView cur) children
   where
     hasFocus = cur == label
     colorize s =
         if hasFocus
-            then pp $ SGR [31] s
-            else pp s
+            then SGR [31] s
+            else s
 
 
 renderTreeView1 :: Bool -> TreeView -> Trammel String
