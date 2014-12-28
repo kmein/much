@@ -4,6 +4,7 @@
 
 module Scanner
     ( getKey
+    , hGetKey
     ) where
 
 import Prelude hiding ((/))
@@ -17,12 +18,17 @@ import System.IO
 
 
 -- high level interface
+
 getKey :: IO String
-getKey = do
-    _ <- hLookAhead stdin -- wait for input
-    ((_, raw_s), _) <- runScanner scan
+getKey = hGetKey stdin
+
+hGetKey :: Handle -> IO String
+hGetKey h = do
+    _ <- hLookAhead h -- wait for input
+    ((_, raw_s), _) <- runScanner $ scan h
     return $ map toChar raw_s
 
+
 
 type P = C
 type I = C
@@ -80,42 +86,43 @@ scan, scanESC, scanCS ::
     , MonadError ScanError m
     , MonadState ScanState m
     , MonadWriter ScanLog m
-    ) => m ()
+    )
+    => Handle
+    -> m ()
 
-
-scan = do
-    c <- liftIO $ hGetC stdin
+scan h = do
+    c <- liftIO $ hGetC h
     tell [c]
     case () of _
-                | c == 01/11 -> scanESC
+                | c == 01/11 -> scanESC h
                 | otherwise -> return ()
 
 
-scanESC = do
-    mb_c <- liftIO $ hWaitGetC timeout stdin
+scanESC h = do
+    mb_c <- liftIO $ hWaitGetC timeout h
     whenJust mb_c $ \ c -> do
         tell [c]
         case () of _
                     | c == 05/11 ->
                         -- CSI
-                        scanCS
+                        scanCS h
 
                     | c == 01/11 ->
                         -- XXX M-F1 and other crazy chords may cause
                         -- \ESC\ESC... on wu, so we just recurse here...
-                        scanESC
+                        scanESC h
 
                     | c == 04/15 ->
                         -- XXX Non-CSI SS3
-                        one $ between (04/00) (07/14)
+                        one h $ between (04/00) (07/14)
 
                     | otherwise -> return ()
 
 
-scanCS = do
-    zeroOrMore $ between (03/00) (03/15)    -- parameter bytes
-    zeroOrMore $ between (02/00) (02/15)    -- intermediate bytes
-    one $ between (04/00) (07/14)           -- final byte
+scanCS h = do
+    zeroOrMore h $ between (03/00) (03/15)    -- parameter bytes
+    zeroOrMore h $ between (02/00) (02/15)    -- intermediate bytes
+    one h $ between (04/00) (07/14)           -- final byte
 
 
 between :: C -> C -> (C -> Bool)
@@ -128,21 +135,23 @@ zeroOrMore, one ::
     , MonadError ScanError m
     , MonadState ScanState m
     , MonadWriter ScanLog m
-    ) => (C -> Bool) -> m ()
+    )
+    => Handle
+    -> (C -> Bool)
+    -> m ()
 
-
-zeroOrMore p = do
-    mb_c <- liftIO $ hWaitLookAheadC timeout stdin
+zeroOrMore h p = do
+    mb_c <- liftIO $ hWaitLookAheadC timeout h
     whenJust mb_c $ \ c ->
         when (p c) $ do
-            _ <- liftIO $ hGetC stdin -- drop
+            _ <- liftIO $ hGetC h -- drop
             tell [c]
             modify $ \q -> q { buffer = buffer q ++ [c] }
-            zeroOrMore p
+            zeroOrMore h p
 
 
-one p = do
-    mb_c <- liftIO $ hWaitLookAheadC timeout stdin
+one h p = do
+    mb_c <- liftIO $ hWaitLookAheadC timeout h
     whenJust mb_c $ \ c -> do
         if p c
             then do
