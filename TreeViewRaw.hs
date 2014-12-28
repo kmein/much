@@ -34,19 +34,34 @@ renderTreeView1 hasFocus = \case
     TVSearch s ->
         Plain s
 
-    TVSearchResult sr -> Plain $
-        (padl 11 ' ' $ T.unpack $ Notmuch.searchDateRel sr)
-        ++ "("
-        ++ (show $ Notmuch.searchMatched sr)
-        ++ ")  "
-        ++ (T.unpack $ Notmuch.searchSubject sr)
-        -- ++ " "
-        -- ++ (let Notmuch.ThreadID tid = Notmuch.searchThread sr in tid)
+    TVSearchResult sr ->
+        let c = case (hasFocus, "unread" `elem` Notmuch.searchTags sr) of
+                    (False, False) -> SGR [38,5,240]
+                    (False,  True) -> SGR [38,5,250]
+                    (True,  False) -> SGR [38,5,088]
+                    (True,   True) -> SGR [38,5,160]
+        in c $
+        Plain (
+            (padl 11 ' ' $ T.unpack $ Notmuch.searchDateRel sr)
+            ++ " (" ++ (show $ Notmuch.searchMatched sr) ++ ")  "
+            ++ (T.unpack $ Notmuch.searchSubject sr)
+            ++ " "
+            )
+        <>
+        mconcat (L.intersperse " " (map (SGR [38,5,036] . Plain . T.unpack) $ Notmuch.searchTags sr))
 
-    TVMessage m -> Plain $
-        (Notmuch.unMessageID $ Notmuch.messageId m)
-        ++ " "
-        ++ T.unpack (T.intercalate (T.pack ",") $ Notmuch.messageTags m)
+    TVMessage m ->
+        let c = case (hasFocus, "unread" `elem` Notmuch.messageTags m) of
+                    (False, False) -> SGR [38,5,240]
+                    (False,  True) -> SGR [38,5,250]
+                    (True,  False) -> SGR [38,5,088]
+                    (True,   True) -> SGR [38,5,160]
+        in c $
+        Plain (
+            (Notmuch.unMessageID $ Notmuch.messageId m)
+            ++ " "
+            ++ T.unpack (T.intercalate (T.pack ",") $ Notmuch.messageTags m)
+            )
 
     TVMessageHeaderField m fieldName -> Plain $
         let k = T.unpack $ CI.original fieldName
