@@ -114,7 +114,7 @@ startup = do
         ]
 
     threadIds <- mapM forkIO
-        [ inputHandler putEvent
+        [ forever $ getKey >>= putEvent . EKey
         , run getEvent q0
         ]
 
@@ -131,12 +131,6 @@ winchHandler putEvent =
             putEvent $ EResize w h
         Nothing ->
             return ()
-
-
-inputHandler :: (Event -> IO ()) -> IO ()
-inputHandler putEvent = forever $ do
-    -- TODO make stdin configurable
-    getKey >>= putEvent . EKey
 
 
 run :: IO Event -> State -> IO ()
