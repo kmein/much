@@ -160,6 +160,7 @@ keymap "\ESC[b" = Just $ moveTreeUp 1
 keymap "\ESC[5~" = Just $ \q -> moveTreeDown (screenHeight q `div` 2) q   -- PgUp
 keymap "\ESC[6~" = Just $ \q -> moveTreeUp (screenHeight q `div` 2) q -- PgDn
 keymap "\n" = Just toggleFold
+keymap "\DEL" = Just moveToParent -- backspace
 
 keymap ('\ESC':'[':'9':';':xs) = Just $ \q@State{..} -> do
     let (h,';':w) = break (==';') (take (length xs - 1) xs) -- ^ drop (assumed) trailing 't'
@@ -212,6 +213,15 @@ moveTreeDown n q@State{..} =
         0 -> return q'
         i -> moveCursorUp i q'
 
+
+moveToParent q@State{..} =
+    case Z.parent cursor of
+        Nothing -> return q { flashMessage = "cannot go further up" }
+        Just cursor' ->
+            let q' = q { cursor = cursor' }
+            in case topOverrun q' of
+                0 -> return q'
+                i -> moveTreeDown i q'
 
 
 toggleFold :: State -> IO State
