@@ -19,19 +19,13 @@ let
     terminfo.nativeBuildInputs ++
     [
       cabalInstall
-      dataDefault
-      vtyUi
-
-      # for NotmuchCmd
       aeson
-      #blazeHtml
       caseInsensitive
-      #conduit
-      #conduitExtra
       friendly-time
       process
       rosezipper
       safe
+      split
       terminalSize
     ]
   );

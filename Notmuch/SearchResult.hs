@@ -9,7 +9,7 @@ import Data.Time.Clock
 import Data.Time.Clock.POSIX
 
 
-newtype ThreadID = ThreadID String
+newtype ThreadID = ThreadID { unThreadID :: String }
   deriving (Show,Read,Eq,FromJSON,ToJSON)
 
 

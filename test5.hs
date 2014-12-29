@@ -5,6 +5,7 @@
 module Main (main) where
 
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
 import qualified Notmuch
@@ -26,6 +27,7 @@ import System.IO
 import System.Posix.Files
 import System.Posix.Signals
 import System.Process
+import TagUtils
 import Trammel
 import TreeSearch
 import TreeView
@@ -206,6 +208,7 @@ keymap :: String -> Maybe (State -> IO State)
 
 keymap "r" = Just replyToAll
 keymap "e" = Just viewSource
+keymap "t" = Just $ editTags
 keymap "k" = Just $ moveCursorUp 1
 keymap "j" = Just $ moveCursorDown 1
 keymap "K" = Just $ moveTreeDown 1
@@ -220,6 +223,10 @@ keymap "\ESC[5~" = Just $ \q -> moveTreeDown (screenHeight q `div` 2) q   -- PgU
 keymap "\ESC[6~" = Just $ \q -> moveTreeUp (screenHeight q `div` 2) q     -- PgDn
 keymap "\n" = Just toggleFold
 keymap "\DEL" = Just moveToParent -- backspace
+
+-- TODO Stuff Vim sends after exit (also there is more...)
+keymap "\ESC[2;2R" = Just $ \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
+keymap "\ESC[>85;95;0c" = Just $ \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
 
 keymap _ = Nothing
 
@@ -403,3 +410,89 @@ viewSource q@State{..} = case getMessage (Z.label cursor) of
                         ExitSuccess ->
                             return ()
         return q
+
+
+-- TODO editTags is too convoluted
+editTags :: State -> IO State
+editTags q@State{..} = case Z.label cursor of
+    TVSearchResult sr -> do
+        edit
+            (Notmuch.searchTags sr)
+            ("thread:" <> (Notmuch.unThreadID $ Notmuch.searchThread sr))
+            (\tagOps loc ->
+                Z.modifyTree (patchTreeTags tagOps) loc
+            )
+
+    TVMessage m -> do
+        edit
+            (Notmuch.messageTags m)
+            ("id:" <> (Notmuch.unMessageID $ Notmuch.messageId m)) -- TODO describe war besser
+            (\tagOps mloc ->
+                -- TODO this needs test cases
+                let
+                    -- patch message
+                    mloc' = Z.modifyTree (patchRootLabelTags tagOps) mloc
+
+                    -- find search result of message
+                    srloc = fromMaybe (error "could not find search result of message")
+                                      (findParent isTVSearchResult mloc')
+
+                    -- patch search result
+                    srloc' = Z.modifyTree (patchRootLabelTags tagOps) srloc
+
+                in
+                  -- return message
+                  fromMaybe (error "could not find message again")
+                            (findTree (==Z.label mloc) srloc')
+                )
+    _ ->
+        return q { flashMessage = "cannot edit tags here" }
+  where
+    edit tags query patch = do
+        editor <- getEnv "EDITOR"
+        logname <- getEnv "LOGNAME"
+        tmpdir <- getTemporaryDirectory
+
+        let template = logname ++ "_much_.tags"
+
+        withTempFile tmpdir template $ \(path, draftH) -> do
+            hPutStr stdout "\ESC[?1049h" -- TODO geht besser
+            hPutStr stdout "\ESC[?25l" -- TODO war mal besser
+            setFileMode path 0o600
+
+            -- generate draft
+            T.hPutStrLn draftH $ T.intercalate " " tags
+            hPutStrLn draftH $ "# " <> query
+
+            hClose draftH
+            -- TODO factorize editor
+            (system $ editor ++ " " ++ path) >>= \case
+                ExitFailure code -> do
+                    return q { flashMessage = Plain $ editor ++ " exit code = " ++ show code }
+                ExitSuccess -> do
+                    -- TODO parse could fail
+                    tags' <- parseTags <$> readFile path
+
+                    case diffTags tags tags' of
+                        [] ->
+                            return q { flashMessage = Plain "nothing happened" } -- TODO highlight
+                        tagOps -> do
+                            (_, _, _, procH) <-
+                                withFile "/dev/null" ReadWriteMode $ \nullH ->
+                                    -- TODO batch tagging(?)
+                                    -- TODO proper type for query
+                                    createProcess
+                                        (proc "notmuch" $ [ "tag" ] ++ tagOpsToArgs tagOps ++ [ "--", query ])
+                                            { std_in = UseHandle nullH
+                                            , std_out = UseHandle nullH
+                                            }
+                            waitForProcess procH >>= \case
+                                ExitFailure code ->
+                                    return q { flashMessage = Plain $ "notmuch exit code = " ++ show code }
+                                ExitSuccess ->
+                                    return q { cursor = select (==Z.label cursor) (patch tagOps cursor) }
+
+    -- TODO DRY select
+    select p loc =
+        let root = Z.root loc
+        in fromMaybe root $ findTree p root
