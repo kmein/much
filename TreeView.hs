@@ -111,7 +111,7 @@ xconvPartContent
   :: Message -> MessagePart -> MessageContent -> Forest TreeView
 xconvPartContent m p = \case
     ContentText t ->
-        map (xconvLine m p) (zip [0..] ("" : T.lines t))
+        map (xconvLine m p) $ zip [0..] (T.lines t)
     ContentMultipart parts ->
         map (xconvPart2 m) parts
         -- [Node (TVMessageLine m p 0 "ContentMultipart") []]
