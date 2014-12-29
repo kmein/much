@@ -2,4 +2,12 @@
 , src ? ./.
 , name ? "much"
 }:
-pkgs.haskellPackages.buildLocalCabal src name
+let
+  inherit (pkgs.haskellPackages) buildLocalCabalWithArgs callPackage;
+in
+buildLocalCabalWithArgs {
+  inherit src name;
+  args = {
+    friendlyTime = callPackage ./nix/friendly-time {};
+  };
+}

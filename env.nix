@@ -28,6 +28,7 @@ let
       caseInsensitive
       #conduit
       #conduitExtra
+      friendly-time
       process
       rosezipper
       safe
@@ -37,8 +38,7 @@ let
 
   hsPkgs = pkgs.haskellPackages_ghc783_profiling.override {
     extension = self: super: with self; {
-      #vty = callPackage ./nixpkgs/vty-5.2.5.nix { #{{{
-      #}; #}}}
+      friendly-time = callPackage ./nix/friendly-time {};
     };
   };
 

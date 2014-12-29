@@ -17,6 +17,7 @@ import Control.Exception
 import Control.Monad
 import Data.Maybe
 import Data.Monoid
+import Data.Time
 import Scanner (getKey)
 import System.Directory
 import System.Environment
@@ -135,9 +136,10 @@ winchHandler putEvent =
 
 run :: IO Event -> State -> IO ()
 run getEvent = rec where
-    rec q = rec =<<
-        let q' = render q
-        in redraw q' >> getEvent >>= processEvent q'
+    rec q = rec =<< do
+        now <- getCurrentTime
+        let q' = render now q
+        redraw q' >> getEvent >>= processEvent q'
 
 
 processEvent :: State -> Event -> IO State
@@ -161,13 +163,13 @@ processEvent q = \case
             }
 
 
-render :: State -> State
-render q@State{..} =
+render :: UTCTime -> State -> State
+render now q@State{..} =
     q { treeBuffer = newTreeBuf
       , headBuffer = newHeadBuf
       }
   where
-    newTreeBuf = renderTreeView (Z.label cursor) (Z.toTree cursor)
+    newTreeBuf = renderTreeView now (Z.label cursor) (Z.toTree cursor)
     newHeadBuf =
         [ Plain (show screenWidth) <> "x" <> Plain (show screenHeight)
           <> " " <> Plain (show $ linearPos cursor - yoffset)
