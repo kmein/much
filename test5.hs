@@ -155,17 +155,9 @@ processEvent q = \case
     EFlash t ->
         return q { flashMessage = t }
     EKey s ->
-        case keymap s of
-            Just a ->
-                a q
-            Nothing ->
-                return q { flashMessage = Plain $ show s }
+        keymap s q
     EMouse info ->
-        case mousemap info of
-            Just a ->
-                a q
-            Nothing ->
-                return q { flashMessage = SGR [38,5,202] $ Plain $ show info }
+        mousemap info q
     EResize w h ->
         return q
             { screenWidth = w, screenHeight = h
@@ -216,39 +208,40 @@ redraw q@State{..} = do
 
 
 
-keymap :: String -> Maybe (State -> IO State)
+keymap :: String -> State -> IO State
 
-keymap "r" = Just replyToAll
-keymap "e" = Just viewSource
-keymap "t" = Just $ editTags
-keymap "k" = Just $ moveCursorUp 1
-keymap "j" = Just $ moveCursorDown 1
-keymap "K" = Just $ moveTreeDown 1
-keymap "J" = Just $ moveTreeUp 1
-keymap "\ESC[A" = Just $ moveCursorUp 1
-keymap "\ESC[B" = Just $ moveCursorDown 1
-keymap "\ESC[a" = Just $ moveTreeDown 1
-keymap "\ESC[b" = Just $ moveTreeUp 1
-keymap "\ESC[c" = Just $ moveTreeLeft 1   -- S-Right
-keymap "\ESC[d" = Just $ moveTreeRight 1  -- S-Left
-keymap "\ESC[5~" = Just $ \q -> moveTreeDown (screenHeight q `div` 2) q   -- PgUp
-keymap "\ESC[6~" = Just $ \q -> moveTreeUp (screenHeight q `div` 2) q     -- PgDn
-keymap "\n" = Just toggleFold
-keymap "\DEL" = Just moveToParent -- backspace
+keymap "r" = replyToAll
+keymap "e" = viewSource
+keymap "t" = editTags
+keymap "k" = moveCursorUp 1
+keymap "j" = moveCursorDown 1
+keymap "K" = moveTreeDown 1
+keymap "J" = moveTreeUp 1
+keymap "\ESC[A" = moveCursorUp 1
+keymap "\ESC[B" = moveCursorDown 1
+keymap "\ESC[a" = moveTreeDown 1
+keymap "\ESC[b" = moveTreeUp 1
+keymap "\ESC[c" = moveTreeLeft 1  -- S-Right
+keymap "\ESC[d" = moveTreeRight 1 -- S-Left
+keymap "\ESC[5~" = \q -> moveTreeDown (screenHeight q `div` 2) q  -- PgUp
+keymap "\ESC[6~" = \q -> moveTreeUp (screenHeight q `div` 2) q    -- PgDn
+keymap "\n" = toggleFold
+keymap "\DEL" = moveToParent  -- backspace
 
 -- TODO Stuff Vim sends after exit (also there is more...)
-keymap "\ESC[2;2R" = Just $ \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
-keymap "\ESC[>85;95;0c" = Just $ \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
+keymap "\ESC[2;2R" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
+keymap "\ESC[>85;95;0c" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
 
-keymap _ = Nothing
+keymap s = \q ->
+    return q { flashMessage = Plain $ show s }
 
 
-mousemap :: MouseInfo -> Maybe (State -> IO State)
+mousemap :: MouseInfo -> State -> IO State
 
-mousemap MouseInfo{mouseButton=4} = Just $ moveTreeDown 3
-mousemap MouseInfo{mouseButton=5} = Just $ moveTreeUp 3
+mousemap MouseInfo{mouseButton=4} = moveTreeDown 3
+mousemap MouseInfo{mouseButton=5} = moveTreeUp 3
 
-mousemap MouseInfo{mouseButton=1,mouseY=y} = Just $ \q@State{..} -> do
+mousemap MouseInfo{mouseButton=1,mouseY=y} = \q@State{..} -> do
     let linearClickPos =
             let i = (y - length headBuffer + yoffset) - 1 {-zero-based-}
             in if 0 <= i && i < length treeBuffer
@@ -264,9 +257,10 @@ mousemap MouseInfo{mouseButton=1,mouseY=y} = Just $ \q@State{..} -> do
                 { cursor = findNextN i $ Z.root cursor
                 }
 
-mousemap MouseInfo{mouseButton=0} = Just return
+mousemap MouseInfo{mouseButton=0} = return
 
-mousemap _ = Nothing
+mousemap info = \q ->
+    return q { flashMessage = SGR [38,5,202] $ Plain $ show info }
 
 
 
