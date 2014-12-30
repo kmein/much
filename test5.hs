@@ -238,10 +238,16 @@ keymap s = \q ->
 
 mousemap :: MouseInfo -> State -> IO State
 
+mousemap MouseInfo{mouseButton=1,mouseY=y} = defaultMouse1Click y
+mousemap MouseInfo{mouseButton=3,mouseY=y} = \q -> defaultMouse1Click y q >>= toggleFold
 mousemap MouseInfo{mouseButton=4} = moveTreeDown 3
 mousemap MouseInfo{mouseButton=5} = moveTreeUp 3
+mousemap MouseInfo{mouseButton=0} = return
+mousemap info = \q ->
+    return q { flashMessage = SGR [38,5,202] $ Plain $ show info }
 
-mousemap MouseInfo{mouseButton=1,mouseY=y} = \q@State{..} -> do
+
+defaultMouse1Click y q@State{..} = do
     let linearClickPos =
             let i = (y - length headBuffer + yoffset) - 1 {-zero-based-}
             in if 0 <= i && i < length treeBuffer
@@ -256,11 +262,6 @@ mousemap MouseInfo{mouseButton=1,mouseY=y} = \q@State{..} -> do
             return q
                 { cursor = findNextN i $ Z.root cursor
                 }
-
-mousemap MouseInfo{mouseButton=0} = return
-
-mousemap info = \q ->
-    return q { flashMessage = SGR [38,5,202] $ Plain $ show info }
 
 
 
