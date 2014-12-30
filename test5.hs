@@ -48,6 +48,8 @@ data State = State
     , headBuffer :: [Trammel String]
     , treeBuffer :: [Trammel String]
     , now :: UTCTime
+    , decset :: [Int]
+    , decrst :: [Int]
     }
 
 
@@ -67,45 +69,39 @@ initState = do
         , headBuffer = []
         , treeBuffer = []
         , now = UTCTime (fromGregorian 1984 5 23) 49062
+        , decset =
+            1000 : -- X & Y on button press and release
+            1005 : -- UTF-8 mouse mode
+            1049 : -- use cleared alternate screen buffer
+            []
+        , decrst =
+            25 : -- hide cursor
+            []
         }
 
 
 main :: IO ()
 main =
-    finally (startup decset decrst)
-            (cleanup decset decrst)
-  where
-    decset =
-        1000 : -- X & Y on button press and release
-        1005 : -- UTF-8 mouse mode
-        1049 : -- use cleared alternate screen buffer
-        []
-    decrst =
-        25 : -- hide cursor
-        []
+    bracket initState cleanup startup
 
 
-cleanup :: [Int] -> [Int] -> IO ()
-cleanup decset decrst = do
+cleanup :: State -> IO ()
+cleanup q@State{..} = do
     hSetEcho stdin True
-    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decset) ++ "l"
-    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decrst) ++ "h"
+    resetTerm q { decset = decrst, decrst = decset }
 
 
-startup :: [Int] -> [Int] -> IO ()
-startup decset decrst = do
+startup :: State -> IO ()
+startup q0 = do
 
     -- load-env hack
     maybe (return ()) (setEnv "HOME") =<< lookupEnv "OLDHOME"
 
+    -- TODO move this to resetTerm?
     hSetBuffering stdin NoBuffering
     hSetBuffering stdout (BlockBuffering $ Just 4096)
 
-    hSetEcho stdin False
-    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decset) ++ "h"
-    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decrst) ++ "l"
-
-    q0@State{..} <- initState
+    resetTerm q0
 
     (putEvent, getEvent) <- do
         v <- newEmptyMVar
@@ -130,6 +126,12 @@ startup decset decrst = do
 
     waitForShutdown
     mapM_ killThread threadIds
+
+
+resetTerm State{..} = do
+    hSetEcho stdin False
+    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decset) ++ "h"
+    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decrst) ++ "l"
 
 
 winchHandler :: (Event -> IO ()) -> IO ()
@@ -402,7 +404,7 @@ replyToAll q@State{..} = case getMessage (Z.label cursor) of
                 ExitFailure code ->
                     putStrLn $ "notmuch exit code = " ++ show code
                 ExitSuccess ->
-                    (system $ editor ++ " " ++ path) >>= \case
+                    (system (editor ++ " " ++ path) <* resetTerm q) >>= \case
                         ExitFailure code ->
                             putStrLn $ editor ++ " exit code = " ++ show code
                         ExitSuccess ->
@@ -437,7 +439,7 @@ viewSource q@State{..} = case getMessage (Z.label cursor) of
                 ExitFailure code ->
                     putStrLn $ "notmuch exit code = " ++ show code
                 ExitSuccess ->
-                    (system $ editor ++ " " ++ path) >>= \case
+                    (system (editor ++ " " ++ path) <* resetTerm q) >>= \case
                         ExitFailure code ->
                             putStrLn $ editor ++ " exit code = " ++ show code
                         ExitSuccess ->
@@ -499,7 +501,7 @@ editTags q@State{..} = case Z.label cursor of
 
             hClose draftH
             -- TODO factorize editor
-            (system $ editor ++ " " ++ path) >>= \case
+            (system (editor ++ " " ++ path) <* resetTerm q) >>= \case
                 ExitFailure code -> do
                     return q { flashMessage = Plain $ editor ++ " exit code = " ++ show code }
                 ExitSuccess -> do
