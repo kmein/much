@@ -19,6 +19,7 @@ import Control.Monad
 import Data.Maybe
 import Data.Monoid
 import Data.Time
+import Event
 import Scanner (getKey)
 import System.Directory
 import System.Environment
@@ -34,13 +35,6 @@ import TreeView
 import TreeViewRaw
 import Utils
 
-
-data Event =
-    EFlash (Trammel String) |
-    EKey String |
-    EReload |
-    EResize Int Int
-  deriving Show
 
 
 data State = State
