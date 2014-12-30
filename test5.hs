@@ -47,6 +47,7 @@ data State = State
     , screenHeight :: Int
     , headBuffer :: [Trammel String]
     , treeBuffer :: [Trammel String]
+    , now :: UTCTime
     }
 
 
@@ -65,6 +66,7 @@ initState = do
         , screenHeight = 0
         , headBuffer = []
         , treeBuffer = []
+        , now = UTCTime (fromGregorian 1984 5 23) 49062
         }
 
 
@@ -142,8 +144,8 @@ winchHandler putEvent =
 run :: IO Event -> State -> IO ()
 run getEvent = rec where
     rec q = rec =<< do
-        now <- getCurrentTime
-        let q' = render now q
+        t <- getCurrentTime
+        let q' = render q { now = t }
         redraw q' >> getEvent >>= processEvent q'
 
 
@@ -175,8 +177,8 @@ processEvent q = \case
             }
 
 
-render :: UTCTime -> State -> State
-render now q@State{..} =
+render :: State -> State
+render q@State{..} =
     q { treeBuffer = newTreeBuf
       , headBuffer = newHeadBuf
       }
