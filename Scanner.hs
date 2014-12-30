@@ -1,217 +1,102 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Scanner
-    ( getKey
-    , hGetKey
+    ( scan
     ) where
 
-import Prelude hiding ((/))
-import Control.Applicative
-import Control.Monad.Error
-import Control.Monad.State
-import Control.Monad.Writer
-import Data.Bits
-import Data.Char
-import System.IO
+import Data.Char (ord)
+import Event
+import System.IO (Handle, hGetChar, hLookAhead, hWaitForInput)
 
 
--- high level interface
-
-getKey :: IO String
-getKey = hGetKey stdin
-
-hGetKey :: Handle -> IO String
-hGetKey h = do
-    _ <- hLookAhead h -- wait for input
-    ((_, raw_s), _) <- runScanner $ scan h
-    return $ map toChar raw_s
-
-
-
-type P = C
-type I = C
-type F = C
-
-
-data Token
-    = CS [P] [I] F
-    | Chr C
-  deriving (Show)
-
-
-type ScanLog = [C]
-
-
-type ScanError = String
-
-
-data ScanState = ScanState
-    { _result :: Maybe Token -- TODO underscore supresses warning, rename before usage..
-    , buffer :: [C]
-    }
-
-
-emptyScanState :: ScanState
-emptyScanState = ScanState Nothing []
-
-
-newtype Scanner m a = Scanner
-    (ErrorT ScanError (WriterT ScanLog (StateT ScanState m)) a)
-  deriving
-    ( Applicative
-    , Functor
-    , Monad
-    , MonadIO
-    , MonadState ScanState
-    , MonadError ScanError
-    , MonadWriter ScanLog
-    )
-
-
-runScanner :: Scanner m a -> m ((Either ScanError a, ScanLog), ScanState)
-runScanner (Scanner a) =
-    runStateT (runWriterT (runErrorT a)) emptyScanState
-
-
--- TODO max timeout
 timeout :: Int
 timeout = 1
 
 
-scan, scanESC, scanCS ::
-    ( Monad m
-    , MonadIO m
-    , MonadError ScanError m
-    , MonadState ScanState m
-    , MonadWriter ScanLog m
-    )
-    => Handle
-    -> m ()
-
-scan h = do
-    c <- liftIO $ hGetC h
-    tell [c]
-    case () of _
-                | c == 01/11 -> scanESC h
-                | otherwise -> return ()
-
-
-scanESC h = do
-    mb_c <- liftIO $ hWaitGetC timeout h
-    whenJust mb_c $ \ c -> do
-        tell [c]
-        case () of _
-                    | c == 05/11 ->
-                        -- CSI
-                        scanCS h
-
-                    | c == 01/11 ->
-                        -- XXX M-F1 and other crazy chords may cause
-                        -- \ESC\ESC... on wu, so we just recurse here...
-                        scanESC h
-
-                    | c == 04/15 ->
-                        -- XXX Non-CSI SS3
-                        one h $ between (04/00) (07/14)
-
-                    | otherwise -> return ()
-
-
-scanCS h = do
-    zeroOrMore h $ between (03/00) (03/15)    -- parameter bytes
-    zeroOrMore h $ between (02/00) (02/15)    -- intermediate bytes
-    one h $ between (04/00) (07/14)           -- final byte
-
-
-between :: C -> C -> (C -> Bool)
-between lo hi = \ x -> lo <= x && x <= hi
-
-
-zeroOrMore, one ::
-    ( Monad m
-    , MonadIO m
-    , MonadError ScanError m
-    , MonadState ScanState m
-    , MonadWriter ScanLog m
-    )
-    => Handle
-    -> (C -> Bool)
-    -> m ()
-
-zeroOrMore h p = do
-    mb_c <- liftIO $ hWaitLookAheadC timeout h
-    whenJust mb_c $ \ c ->
-        when (p c) $ do
-            _ <- liftIO $ hGetC h -- drop
-            tell [c]
-            modify $ \q -> q { buffer = buffer q ++ [c] }
-            zeroOrMore h p
-
-
-one h p = do
-    mb_c <- liftIO $ hWaitLookAheadC timeout h
-    whenJust mb_c $ \ c -> do
-        if p c
-            then do
-                _ <- liftIO getChar
-                tell [c]
-                modify $ \q -> q { buffer = buffer q ++ [c] }
-            else do
-                throwError "expected one TODO"
-
-
-
-
-
-
-
-
-whenJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
-whenJust mb f =
-    case mb of
-        Just a -> f a
-        Nothing -> return ()
-
-
-
-(/) :: Int -> Int -> C
-c / r = C c r
-
-
-data C = C { column :: Int, row :: Int }
-    deriving (Eq)
-
-
-instance Show C where
-  show C{..} = 
-      (padl 2 '0' $ show column) ++ "/" ++ (padl 2 '0' $ show row)
-    where
-      padl n c s
-        | length s < n = padl n c (c : s)
-        | otherwise = s
-
-
-instance Ord C where
-    compare (C c1 r1) (C c2 r2) =
-        case compare c1 c2 of
-            EQ -> compare r1 r2
-            x -> x
-
-
-fromChar :: Char -> C
-fromChar c = let i = ord c in C ((shift i (-4)) .&. 0xf) (i .&. 0xf)
-
-toChar :: C -> Char
-toChar (C col row) = chr $ (shift col 4) .|. row
-
+scan :: Handle -> IO Event
+scan h =
+    hGetChar h >>= \case
+        '\ESC' -> scanESC h
+        c -> return $ EKey [c]
 
---
 
 
-hGetC :: Handle -> IO C
-hGetC h = hGetChar h >>= return . fromChar
+scanESC :: Handle -> IO Event
+scanESC h =
+    hWaitGetChar timeout h >>= \case
+        Nothing -> return $ EKey "\ESC"
+        Just c
+            | c == '[' -> -- 05/11
+                scanCS h
+            | c == '\ESC' -> -- 01/11
+                -- XXX M-F1 and other crazy chords may cause
+                -- \ESC\ESC... on wu, so we just recurse here...
+                scanESC h
+            | c == 'O' -> -- 04/15
+                -- XXX Non-CSI SS3
+                -- XXX finalByte is maybe calles somehow else here, but it's
+                -- the same range
+                one h finalByte ['O','\ESC'] >>=
+                return . EKey . reverse
+            | otherwise ->
+                return $ EKey ['\ESC',c]
+
+
+scanCS :: Handle -> IO Event
+scanCS h =
+    hWaitLookAhead timeout h >>= \case
+        Nothing -> return $ EKey "\ESC" -- TODO move this to scanESC
+        Just c
+            | c == 'M' -> do
+                -- VT200 mouse
+                _ <- hGetChar h -- drop 'M'
+                b <- hGetChar h
+                x <- hGetChar h
+                y <- hGetChar h
+                return $ EMouse b (ord x - 32) (ord y - 32)
+            | otherwise ->
+                zeroOrMore h parameterByte ['[', '\ESC'] >>=
+                zeroOrMore h intermediateByte >>=
+                one h finalByte >>=
+                return . EKey . reverse
+
+
+
+zeroOrMore :: Handle -> (Char -> Bool) -> [Char] -> IO [Char]
+zeroOrMore h p buf =
+    hWaitLookAhead timeout h >>= \case
+        Nothing -> return buf
+        Just c
+            | p c ->
+                hGetChar h {-drop c-} >> zeroOrMore h p (c:buf)
+            | otherwise ->
+                return buf
+
+
+one :: Handle -> (Char -> Bool) -> [Char] -> IO [Char]
+one h p buf =
+    hWaitLookAhead timeout h >>= \case
+        Nothing -> return buf -- TODO error?
+        Just c
+            | p c -> do
+                _ <- hGetChar h -- drop c
+                return (c:buf)
+            | otherwise ->
+                error "expected one TODO"
+
+
+parameterByte :: Char -> Bool
+parameterByte = between '0' '?'     -- 03/00 03/15
+
+intermediateByte :: Char -> Bool
+intermediateByte = between ' ' '/'  -- 02/00 02/15
+
+finalByte :: Char -> Bool
+finalByte = between '@' '~'         -- 04/00 07/14
+
+
+between :: Ord a => a -> a -> (a -> Bool)
+between lo hi = \ x -> lo <= x && x <= hi
 
 
 hWaitGetChar :: Int -> Handle -> IO (Maybe Char)
@@ -222,17 +107,9 @@ hWaitGetChar t h = do
         else return Nothing
 
 
-hWaitGetC :: Int -> Handle -> IO (Maybe C)
-hWaitGetC t h = do
-    mb_ch <- hWaitGetChar t h
-    case mb_ch of
-        Nothing -> return Nothing
-        Just ch -> return $ Just $ fromChar $ ch
-
-
-hWaitLookAheadC :: Int -> Handle -> IO (Maybe C)
-hWaitLookAheadC t h = do
+hWaitLookAhead :: Int -> Handle -> IO (Maybe Char)
+hWaitLookAhead t h = do
     ready <- hWaitForInput h t
     if ready
-        then hLookAhead h >>= return . Just . fromChar
+        then hLookAhead h >>= return . Just
         else return Nothing

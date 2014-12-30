@@ -20,7 +20,7 @@ import Data.Maybe
 import Data.Monoid
 import Data.Time
 import Event
-import Scanner (getKey)
+import Scanner (scan)
 import System.Directory
 import System.Environment
 import System.Exit
@@ -111,7 +111,7 @@ startup = do
         ]
 
     threadIds <- mapM forkIO
-        [ forever $ getKey >>= putEvent . EKey
+        [ forever $ scan stdin >>= putEvent
         , run getEvent q0
         ]
 
