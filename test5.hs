@@ -16,6 +16,7 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
+import Data.List (intercalate)
 import Data.Maybe
 import Data.Monoid
 import Data.Time
@@ -68,33 +69,41 @@ initState = do
 
 
 main :: IO ()
-main = finally startup cleanup
+main =
+    finally (startup decset decrst)
+            (cleanup decset decrst)
+  where
+    decset =
+        1000 : -- X & Y on button press and release
+        1005 : -- UTF-8 mouse mode
+        1049 : -- use cleared alternate screen buffer
+        []
+    decrst =
+        25 : -- hide cursor
+        []
 
 
-cleanup :: IO ()
-cleanup = do
-    hPutStr stdout "\ESC[?25h"
-    hPutStr stdout "\ESC[?1049l"
+cleanup :: [Int] -> [Int] -> IO ()
+cleanup decset decrst = do
+    hSetEcho stdin True
+    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decset) ++ "l"
+    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decrst) ++ "h"
 
 
-startup :: IO ()
-startup = do
+startup :: [Int] -> [Int] -> IO ()
+startup decset decrst = do
 
     -- load-env hack
     maybe (return ()) (setEnv "HOME") =<< lookupEnv "OLDHOME"
 
-    hSetEcho stdin False
     hSetBuffering stdin NoBuffering
     hSetBuffering stdout (BlockBuffering $ Just 4096)
 
-    q0@State{..} <- initState
+    hSetEcho stdin False
+    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decset) ++ "h"
+    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decrst) ++ "l"
 
-    --hSetEcho stdin False
-    --hSetBuffering stdin NoBuffering
-    -- Save Cursor and use Alternate Screen Buffer
-    hPutStr stdout "\ESC[?1049h"
-    -- Hide Cursor
-    hPutStr stdout "\ESC[?25l"
+    q0@State{..} <- initState
 
     (putEvent, getEvent) <- do
         v <- newEmptyMVar
@@ -138,6 +147,7 @@ run getEvent = rec where
         redraw q' >> getEvent >>= processEvent q'
 
 
+-- TODO merge EKey and EMouse?
 processEvent :: State -> Event -> IO State
 processEvent q = \case
     EFlash t ->
@@ -148,6 +158,12 @@ processEvent q = \case
                 a q
             Nothing ->
                 return q { flashMessage = Plain $ show s }
+    EMouse info ->
+        case mousemap info of
+            Just a ->
+                a q
+            Nothing ->
+                return q { flashMessage = SGR [38,5,202] $ Plain $ show info }
     EResize w h ->
         return q
             { screenWidth = w, screenHeight = h
@@ -223,6 +239,32 @@ keymap "\ESC[2;2R" = Just $ \q -> return q { flashMessage = flashMessage q <> " 
 keymap "\ESC[>85;95;0c" = Just $ \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
 
 keymap _ = Nothing
+
+
+mousemap :: MouseInfo -> Maybe (State -> IO State)
+
+mousemap MouseInfo{mouseButton=4} = Just $ moveTreeDown 3
+mousemap MouseInfo{mouseButton=5} = Just $ moveTreeUp 3
+
+mousemap MouseInfo{mouseButton=1,mouseY=y} = Just $ \q@State{..} -> do
+    let linearClickPos =
+            let i = (y - length headBuffer + yoffset) - 1 {-zero-based-}
+            in if 0 <= i && i < length treeBuffer
+                then Just i
+                else Nothing
+    case linearClickPos of
+        Nothing ->
+            return q
+                { flashMessage = Plain $ "nothing to click"
+                }
+        Just i ->
+            return q
+                { cursor = findNextN i $ Z.root cursor
+                }
+
+mousemap MouseInfo{mouseButton=0} = Just return
+
+mousemap _ = Nothing
 
 
 

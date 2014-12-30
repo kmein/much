@@ -4,7 +4,9 @@ module Scanner
     ( scan
     ) where
 
+import Data.Bits ((.&.), testBit)
 import Data.Char (ord)
+import Data.Word (Word8)
 import Event
 import System.IO (Handle, hGetChar, hLookAhead, hWaitForInput)
 
@@ -48,12 +50,11 @@ scanCS h =
         Nothing -> return $ EKey "\ESC" -- TODO move this to scanESC
         Just c
             | c == 'M' -> do
-                -- VT200 mouse
                 _ <- hGetChar h -- drop 'M'
                 b <- hGetChar h
                 x <- hGetChar h
                 y <- hGetChar h
-                return $ EMouse b (ord x - 32) (ord y - 32)
+                return $ parseNormalButton b x y
             | otherwise ->
                 zeroOrMore h parameterByte ['[', '\ESC'] >>=
                 zeroOrMore h intermediateByte >>=
@@ -113,3 +114,28 @@ hWaitLookAhead t h = do
     if ready
         then hLookAhead h >>= return . Just
         else return Nothing
+
+
+parseNormalButton :: Char -> Char -> Char -> Event
+parseNormalButton cb cx cy = do
+    let b = fromIntegral $ ord cb :: Word8
+        x = ord cx - 32
+        y = ord cy - 32
+        button = case (b .&. 3) + (b .&. 64) of
+                0 -> 1
+                1 -> 2
+                2 -> 3
+                3 -> 0 -- release
+                64 -> 4 -- wheel up
+                65 -> 5 -- wheel down
+                66 -> 6 -- wheel left
+                67 -> 7 -- wheel right
+                _ -> error "TODO proper parseNormalButton error"
+    EMouse $ MouseInfo
+        { mouseButton  = button
+        , mouseShift   = testBit b 2
+        , mouseMeta    = testBit b 3
+        , mouseControl = testBit b 4
+        , mouseX       = x
+        , mouseY       = y
+        }
