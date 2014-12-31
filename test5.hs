@@ -232,8 +232,8 @@ keymap "\ESC[d" = moveTreeRight 1 -- S-Left
 keymap "\ESC[5~" = \q -> moveTreeDown (screenHeight q `div` 2) q  -- PgUp
 keymap "\ESC[6~" = \q -> moveTreeUp (screenHeight q `div` 2) q    -- PgDn
 keymap "\n" = toggleFold
-keymap "\ESC[Z" = moveCursorUpToPrevUnreadMessage -- S-Tab
-keymap "\t" = moveCursorDownToNextUnreadMessage
+keymap "\ESC[Z" = moveCursorUpToPrevUnread -- S-Tab
+keymap "\t" = moveCursorDownToNextUnread
 keymap "\DEL" = moveToParent  -- backspace
 
 -- TODO Stuff Vim sends after exit (also there is more...)
@@ -338,13 +338,13 @@ moveToParent q@State{..} =
                 i -> moveTreeDown i q'
 
 
-moveCursorToUnreadMessage
+moveCursorToUnread
     :: (Num a, Monad m, Eq a)
     => (Z.TreePos Z.Full TreeView -> Maybe (Z.TreePos Z.Full TreeView))
     -> (State -> a)
     -> (a -> State -> m State)
     -> State -> m State
-moveCursorToUnreadMessage cursorMove getTreeMoveCount treeMove q@State{..} =
+moveCursorToUnread cursorMove getTreeMoveCount treeMove q@State{..} =
     case cursorMove cursor >>= rec of
         Just cursor' ->
             let q' = q { cursor = cursor' }
@@ -355,23 +355,25 @@ moveCursorToUnreadMessage cursorMove getTreeMoveCount treeMove q@State{..} =
             return q { flashMessage = "no unread message in sight" }
   where
     rec loc =
-        if isUnreadMessage loc
+        if isUnread loc
             then Just loc
             else cursorMove loc >>= rec
-    isUnreadMessage loc =
+    isUnread loc =
         case Z.label loc of
+            TVSearchResult sr ->
+                "unread" `elem` Notmuch.searchTags sr
             TVMessage m ->
                 "unread" `elem` Notmuch.messageTags m
             _ ->
                 False
 
-moveCursorUpToPrevUnreadMessage :: Monad m => State -> m State
-moveCursorUpToPrevUnreadMessage =
-    moveCursorToUnreadMessage findPrev topOverrun moveTreeDown
+moveCursorUpToPrevUnread :: Monad m => State -> m State
+moveCursorUpToPrevUnread =
+    moveCursorToUnread findPrev topOverrun moveTreeDown
 
-moveCursorDownToNextUnreadMessage :: Monad m => State -> m State
-moveCursorDownToNextUnreadMessage =
-    moveCursorToUnreadMessage findNext botOverrun moveTreeUp
+moveCursorDownToNextUnread :: Monad m => State -> m State
+moveCursorDownToNextUnread =
+    moveCursorToUnread findNext botOverrun moveTreeUp
 
 
 toggleFold :: State -> IO State
