@@ -57,6 +57,7 @@ searchSGR
     , unreadMessageSGR
     , unreadSearchSGR
     , killedTagSGR
+    , starTagSGR
     :: Trammel String -> Trammel String
 searchSGR = SGR [38,5,162]
 focusSGR = SGR [38,5,160]
@@ -64,6 +65,7 @@ boringSGR = SGR [38,5,240]
 dateSGR = SGR [38,5,071]
 tagsSGR = SGR [38,5,036]
 killedTagSGR = SGR [38,5,088]
+starTagSGR = SGR [38,5,226]
 
 unreadMessageSGR = SGR [38,5,117]
 unreadSearchSGR = SGR [38,5,250]
@@ -142,6 +144,7 @@ renderTags =
 renderTag :: Tag -> Trammel String
 renderTag tag = case tag of
     "killed" -> killedTagSGR plain
+    "star" -> starTagSGR plain
     _ -> plain
   where
     plain = Plain $ T.unpack tag

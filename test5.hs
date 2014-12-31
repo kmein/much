@@ -215,6 +215,7 @@ keymap :: String -> State -> IO State
 keymap "a" = toggleTagAtCursor "inbox"
 keymap "s" = toggleTagAtCursor "unread"
 keymap "&" = toggleTagAtCursor "killed"
+keymap "*" = toggleTagAtCursor "star"
 keymap "r" = replyToAll
 keymap "e" = viewSource
 keymap "t" = editTags
