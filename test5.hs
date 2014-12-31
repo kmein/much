@@ -355,15 +355,15 @@ moveCursorToUnread cursorMove getTreeMoveCount treeMove q@State{..} =
             return q { flashMessage = "no unread message in sight" }
   where
     rec loc =
-        if isUnread loc
+        if hasTag "unread" loc
             then Just loc
             else cursorMove loc >>= rec
-    isUnread loc =
+    hasTag tag loc =
         case Z.label loc of
             TVSearchResult sr ->
-                "unread" `elem` Notmuch.searchTags sr
+                tag `elem` Notmuch.searchTags sr
             TVMessage m ->
-                "unread" `elem` Notmuch.messageTags m
+                tag `elem` Notmuch.messageTags m
             _ ->
                 False
 
