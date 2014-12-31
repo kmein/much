@@ -49,13 +49,21 @@ renderTreeView now cur _loc@(Node label children) =
 
 -- TODO locale-style: headerKey = \s -> SGR [..] (s <> ": ")
 
-searchSGR, focusSGR, boringSGR, dateSGR, tagsSGR, unreadMessageSGR,
-    unreadSearchSGR :: Trammel String -> Trammel String
+searchSGR
+    , focusSGR
+    , boringSGR
+    , dateSGR
+    , tagsSGR
+    , unreadMessageSGR
+    , unreadSearchSGR
+    , killedTagSGR
+    :: Trammel String -> Trammel String
 searchSGR = SGR [38,5,162]
 focusSGR = SGR [38,5,160]
 boringSGR = SGR [38,5,240]
 dateSGR = SGR [38,5,071]
 tagsSGR = SGR [38,5,036]
+killedTagSGR = SGR [38,5,088]
 
 unreadMessageSGR = SGR [38,5,117]
 unreadSearchSGR = SGR [38,5,250]
@@ -127,7 +135,16 @@ renderFrom = \case
 
 renderTags :: [Tag] -> Trammel String
 renderTags =
-    Plain . T.unpack . T.intercalate " " . L.sort
+    -- TODO sort somewhere else
+    mconcat . L.intersperse " " . map renderTag . L.sort
+
+
+renderTag :: Tag -> Trammel String
+renderTag tag = case tag of
+    "killed" -> killedTagSGR plain
+    _ -> plain
+  where
+    plain = Plain $ T.unpack tag
 
 
 dropAddress :: String -> String
