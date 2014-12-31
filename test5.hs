@@ -212,6 +212,8 @@ redraw q@State{..} = do
 
 keymap :: String -> State -> IO State
 
+keymap "a" = toggleTagAtCursor "inbox"
+keymap "s" = toggleTagAtCursor "unread"
 keymap "r" = replyToAll
 keymap "e" = viewSource
 keymap "t" = editTags
@@ -334,8 +336,8 @@ moveToParent q@State{..} =
 
 toggleFold :: State -> IO State
 toggleFold q@State{..} = case Z.label cursor of
-    TVMessage m -> do
-        toggleTag (T.pack "open") m
+    TVMessage _ -> do
+        q' <- toggleTagAtCursor "open" q
 
         let Just sr = findParent isTVSearchResult cursor
             TVSearchResult the_sr = Z.label sr
@@ -344,7 +346,7 @@ toggleFold q@State{..} = case Z.label cursor of
         t_ <- return . fromMessageForest =<< Notmuch.getThread tid
 
         let cursor' = Z.modifyTree (\(Tree.Node l _) -> Tree.Node l t_) sr
-        return q { cursor = select (==Z.label cursor) cursor' }
+        return q' { cursor = select (==Z.label cursor) cursor' }
 
     TVSearchResult sr -> do
         let open = not $ null $ Tree.subForest $ Z.tree cursor
@@ -363,18 +365,23 @@ toggleFold q@State{..} = case Z.label cursor of
   where
     select p loc = fromMaybe (error "cannot select") $ findTree p $ Z.root loc
 
-    toggleTag :: T.Text -> Notmuch.Message -> IO ()
-    toggleTag tag m = do
-        _ <- if tag `elem` Notmuch.messageTags m
-            then
-                Notmuch.unsetTag tagString (Notmuch.unMessageID $ Notmuch.messageId m)
-            else
-                Notmuch.setTag tagString (Notmuch.unMessageID $ Notmuch.messageId m)
-        return ()
-      where
-        tagString = T.unpack tag
 
+toggleTagAtCursor :: Tag -> State -> IO State
+toggleTagAtCursor tag q@State{..} = case Z.label cursor of
+    TVMessage m -> do
+        -- TODO modify search result tags
+        -- TODO check Notmuch.{set,unset}Tag result
+        if tag `elem` Notmuch.messageTags m
+            then do
+                Notmuch.unsetTag (T.unpack tag) (Notmuch.unMessageID $ Notmuch.messageId m)
+                let cursor' = Z.modifyTree (patchRootLabelTags [DelTag tag]) cursor
+                return q { cursor = cursor' }
+            else do
+                Notmuch.setTag (T.unpack tag) (Notmuch.unMessageID $ Notmuch.messageId m)
+                let cursor' = Z.modifyTree (patchRootLabelTags [AddTag tag]) cursor
+                return q { cursor = cursor' }
 
+    _ -> return q { flashMessage = "nothing happened" }
 
 
 replyToAll :: State -> IO State

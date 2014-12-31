@@ -14,6 +14,7 @@ import Data.Monoid
 import Data.Time
 import Data.Time.Format.Human
 import Data.Tree
+import TagUtils (Tag)
 import Trammel
 import TreeView
 
@@ -124,9 +125,9 @@ renderFrom = \case
     Nothing -> SGR [35,1] "Anonymous"
 
 
-renderTags :: [T.Text] -> Trammel String
-renderTags ts =
-    Plain $ T.unpack $ T.intercalate " " ts
+renderTags :: [Tag] -> Trammel String
+renderTags =
+    Plain . T.unpack . T.intercalate " " . L.sort
 
 
 dropAddress :: String -> String
