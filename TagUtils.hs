@@ -53,9 +53,9 @@ tagOpsToArgs = map $ \case
 patchTags :: [TagOp] -> TreeView -> TreeView
 patchTags tagOps = \case
     TVSearchResult sr ->
-        TVSearchResult $ sr { searchTags = foldr applyTagOp (searchTags sr) tagOps }
+        TVSearchResult sr { searchTags = foldr applyTagOp (searchTags sr) tagOps }
     TVMessage m ->
-        TVMessage $ m { messageTags = foldr applyTagOp (messageTags m) tagOps }
+        TVMessage m { messageTags = foldr applyTagOp (messageTags m) tagOps }
     x -> x -- nop
 
 
