@@ -27,6 +27,7 @@ data TreeView
     = TVMessage Message
     | TVMessageHeaderField Message (CI.CI T.Text)
     | TVMessagePart Message MessagePart
+    | TVMessageQuoteLine Message MessagePart LineNr String
     | TVMessageLine Message MessagePart LineNr String
     | TVSearch String
     | TVSearchResult SearchResult
@@ -46,6 +47,9 @@ instance Eq TreeView where
     TVMessageLine m1 mp1 ln1 _s1 == TVMessageLine m2 mp2 ln2 _s2 =
         m1 == m2 && mp1 == mp2 && ln1 == ln2
 
+    TVMessageQuoteLine m1 mp1 ln1 _s1 == TVMessageQuoteLine m2 mp2 ln2 _s2 =
+        m1 == m2 && mp1 == mp2 && ln1 == ln2
+
     TVSearch s1 == TVSearch s2 =
         s1 == s2
 
@@ -60,6 +64,7 @@ getMessage = \case
     TVMessage m -> Just m
     TVMessageHeaderField m _ -> Just m
     TVMessagePart m _ -> Just m
+    TVMessageQuoteLine m _ _ _ -> Just m
     TVMessageLine m _ _ _ -> Just m
     _ -> Nothing
 
@@ -127,4 +132,17 @@ xconvPart2 m p =
 xconvLine
   :: Message -> MessagePart -> (LineNr, T.Text) -> Tree TreeView
 xconvLine m p (i, s) =
-    Node (TVMessageLine m p i $ T.unpack s) []
+    Node (ctor m p i $ T.unpack s) []
+  where
+    ctor =
+        if isQuoteLine s
+            then TVMessageQuoteLine
+            else TVMessageLine
+
+
+isQuoteLine :: T.Text -> Bool
+isQuoteLine s0 = do
+    let s = T.stripStart s0
+
+    -- /^\s*>/
+    not (T.null s) && T.head s == '>'

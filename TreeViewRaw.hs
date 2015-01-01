@@ -51,6 +51,7 @@ renderTreeView now cur _loc@(Node label children) =
 
 searchSGR
     , focusSGR
+    , quoteSGR
     , boringSGR
     , dateSGR
     , tagsSGR
@@ -61,6 +62,7 @@ searchSGR
     :: Trammel String -> Trammel String
 searchSGR = SGR [38,5,162]
 focusSGR = SGR [38,5,160]
+quoteSGR = SGR [38,5,242]
 boringSGR = SGR [38,5,240]
 dateSGR = SGR [38,5,071]
 tagsSGR = SGR [38,5,036]
@@ -113,6 +115,11 @@ renderTreeView1 now hasFocus x = case x of
             filename = maybe "" (Plain . (" "<>) . show) $ Notmuch.partContentFilename p
             charset = maybe "" (Plain . (" "<>) . show) $ Notmuch.partContentCharset p
         in c $ "part#" <> i <> " " <> t <> filename <> charset
+
+    TVMessageQuoteLine _ _ _ s ->
+        if hasFocus
+            then focusSGR $ Plain s
+            else quoteSGR $ Plain s
 
     TVMessageLine _ _ _ s ->
         if hasFocus

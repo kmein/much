@@ -21,3 +21,9 @@ padl n c s =
     if length s < n
         then padl n c (c:s)
         else s
+
+padr :: Int -> a -> [a] -> [a]
+padr n c s =
+    if length s < n
+        then padr n c (s ++ [c])
+        else s
