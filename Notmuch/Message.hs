@@ -68,7 +68,6 @@ instance FromJSON MessagePart where
 
 data Message = Message {
       messageId :: MessageID
-    , messageDateRel :: T.Text
     , messageTime :: UTCTime
     , messageHeaders :: MessageHeaders
     , messageBody :: [MessagePart]
@@ -86,7 +85,6 @@ instance Eq Message where
 
 instance FromJSON Message where
     parseJSON (Object v) = Message <$> v .: "id"
-                                   <*> v .: "date_relative"
                                    <*> (posixSecondsToUTCTime . fromInteger <$> v .: "timestamp")
                                    <*> (M.mapKeys CI.mk <$> v .: "headers")
                                    <*> v .: "body"
@@ -94,7 +92,7 @@ instance FromJSON Message where
                                    <*> v .: "match"
                                    <*> v .: "tags"
                                    <*> v .: "filename"
-    parseJSON (Array _) = return $ Message (MessageID "") "" defTime M.empty [] True False [] ""
+    parseJSON (Array _) = return $ Message (MessageID "") defTime M.empty [] True False [] ""
         where defTime = UTCTime (ModifiedJulianDay 0) (fromInteger 0)
     parseJSON x = fail $ "Error parsing message: " ++ show x
 
