@@ -110,7 +110,9 @@ renderTreeView1 now hasFocus x = case x of
         let c = if hasFocus then focusSGR else boringSGR
             i = Plain $ show $ Notmuch.partID p
             t = Plain $ T.unpack $ CI.original $ Notmuch.partContentType p
-        in c $ "part#" <> i <> " " <> t
+            filename = maybe "" (Plain . (" "<>) . show) $ Notmuch.partContentFilename p
+            charset = maybe "" (Plain . (" "<>) . show) $ Notmuch.partContentCharset p
+        in c $ "part#" <> i <> " " <> t <> filename <> charset
 
     TVMessageLine _ _ _ s ->
         if hasFocus
