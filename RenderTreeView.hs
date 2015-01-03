@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module TreeViewRaw (renderTreeView) where
+module RenderTreeView (renderTreeView) where
 
 import qualified Notmuch.Message as Notmuch
 import qualified Notmuch.SearchResult as Notmuch

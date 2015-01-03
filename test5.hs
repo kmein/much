@@ -21,6 +21,7 @@ import Data.Maybe
 import Data.Monoid
 import Data.Time
 import Event
+import RenderTreeView (renderTreeView)
 import Scanner (scan)
 import System.Directory
 import System.Environment
@@ -33,7 +34,6 @@ import TagUtils
 import Trammel
 import TreeSearch
 import TreeView
-import TreeViewRaw
 import Utils
 
 
