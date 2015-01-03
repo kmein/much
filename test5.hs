@@ -431,16 +431,8 @@ replyToAll q@State{..} = case getMessage (Z.label cursor) of
     Nothing ->
         return q { flashMessage = "no message" }
     Just m -> do
-        editor <- getEnv "EDITOR"
-        logname <- getEnv "LOGNAME"
-        tmpdir <- getTemporaryDirectory
-
-
-        let template = logname ++ "_much_draft_.mail"
-
         let msgId = Notmuch.unMessageID $ Notmuch.messageId m
-
-        withTempFile tmpdir template $ \(path, draftH) -> do
+        withTempFile' "draft.mail" $ \(path, draftH) -> do
             (_, _, _, procH) <-
                 withFile "/dev/null" ReadMode $ \nullH ->
                     createProcess
@@ -451,14 +443,11 @@ replyToAll q@State{..} = case getMessage (Z.label cursor) of
             hClose draftH
             waitForProcess procH >>= \case
                 ExitFailure code ->
-                    putStrLn $ "notmuch exit code = " ++ show code
+                    return q { flashMessage =
+                                  Plain $ "notmuch exit code = " ++ show code
+                             }
                 ExitSuccess ->
-                    (system (editor ++ " " ++ path) <* resetTerm q) >>= \case
-                        ExitFailure code ->
-                            putStrLn $ editor ++ " exit code = " ++ show code
-                        ExitSuccess ->
-                            return ()
-        return q
+                    runEditor path q
 
 
 viewSource :: State -> IO State
@@ -466,15 +455,8 @@ viewSource q@State{..} = case getMessage (Z.label cursor) of
     Nothing ->
         return q { flashMessage = "no message" }
     Just m -> do
-        editor <- getEnv "EDITOR"
-        logname <- getEnv "LOGNAME"
-        tmpdir <- getTemporaryDirectory
-
-        let template = logname ++ "_much_raw_.mail"
-
         let msgId = Notmuch.unMessageID $ Notmuch.messageId m
-
-        withTempFile tmpdir template $ \(path, draftH) -> do
+        withTempFile' "raw.mail" $ \(path, draftH) -> do
             setFileMode path 0o400
             (_, _, _, procH) <-
                 withFile "/dev/null" ReadMode $ \nullH ->
@@ -486,14 +468,11 @@ viewSource q@State{..} = case getMessage (Z.label cursor) of
             hClose draftH
             waitForProcess procH >>= \case
                 ExitFailure code ->
-                    putStrLn $ "notmuch exit code = " ++ show code
+                    return q { flashMessage =
+                                  Plain $ "notmuch exit code = " ++ show code
+                             }
                 ExitSuccess ->
-                    (system (editor ++ " " ++ path) <* resetTerm q) >>= \case
-                        ExitFailure code ->
-                            putStrLn $ editor ++ " exit code = " ++ show code
-                        ExitSuccess ->
-                            return ()
-        return q
+                    runEditor path q
 
 
 -- TODO editTags is too convoluted
@@ -533,13 +512,7 @@ editTags q@State{..} = case Z.label cursor of
         return q { flashMessage = "cannot edit tags here" }
   where
     edit tags query patch = do
-        editor <- getEnv "EDITOR"
-        logname <- getEnv "LOGNAME"
-        tmpdir <- getTemporaryDirectory
-
-        let template = logname ++ "_much_.tags"
-
-        withTempFile tmpdir template $ \(path, draftH) -> do
+        withTempFile' ".tags" $ \(path, draftH) -> do
             hPutStr stdout "\ESC[?1049h" -- TODO geht besser
             hPutStr stdout "\ESC[?25l" -- TODO war mal besser
             setFileMode path 0o600
@@ -549,10 +522,10 @@ editTags q@State{..} = case Z.label cursor of
             hPutStrLn draftH $ "# " <> query
 
             hClose draftH
-            -- TODO factorize editor
-            (system (editor ++ " " ++ path) <* resetTerm q) >>= \case
+
+            runEditor' path q >>= \case
                 ExitFailure code -> do
-                    return q { flashMessage = Plain $ editor ++ " exit code = " ++ show code }
+                    return q { flashMessage = Plain $ "editor exit code = " ++ show code }
                 ExitSuccess -> do
                     -- TODO parse could fail
                     tags' <- parseTags <$> readFile path
@@ -580,3 +553,27 @@ editTags q@State{..} = case Z.label cursor of
     select p loc =
         let root = Z.root loc
         in fromMaybe root $ findTree p root
+
+
+runEditor :: FilePath -> State -> IO State
+runEditor path q@State{..} =
+    runEditor' path q >>= \case
+        ExitFailure code ->
+            return q { flashMessage =
+                          Plain $ "editor exit code = " ++ show code
+                     }
+        ExitSuccess ->
+            return q
+
+
+runEditor' :: [Char] -> State -> IO ExitCode
+runEditor' path q@State{..} = do
+    editor <- getEnv "EDITOR"
+    system (editor ++ " " ++ path) <* resetTerm q
+
+
+withTempFile' :: FilePath -> ((FilePath, Handle) -> IO a) -> IO a
+withTempFile' s f = do
+    logname <- getEnv "LOGNAME"
+    tmpdir <- getTemporaryDirectory
+    withTempFile tmpdir (logname ++ "_much_" ++ s) f
