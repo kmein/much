@@ -9,6 +9,8 @@ import qualified Data.CaseInsensitive as CI
 import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Text as T
+import qualified Data.Tree.Zipper as Z
+import qualified TreeZipperUtils as Z
 import Data.Char
 import Data.Monoid
 import Data.Time
@@ -39,12 +41,64 @@ humanTimeLocale = defaultHumanTimeLocale
     }
 
 
-renderTreeView :: UTCTime -> TreeView -> Tree TreeView -> [Trammel String]
-renderTreeView now cur _loc@(Node label children) =
-    [ renderTreeView1 now hasFocus label ] ++
-    concatMap (map ("  "<>) . renderTreeView now cur) children
+renderTreeView
+    :: UTCTime
+    -> Z.TreePos Z.Full TreeView
+    -> Z.TreePos Z.Full TreeView
+    -> [Trammel String]
+renderTreeView now cur =
+    renderNode
   where
-    hasFocus = cur == label
+    isFocus = (Z.label cur==) . Z.label
+
+    renderNode loc =
+        renderRootLabel loc :
+        maybeRenderSubForest (Z.firstChild loc)
+
+    renderRootLabel loc =
+        renderPrefix loc <>
+        renderTreeView1 now (isFocus loc) (Z.label loc)
+
+    renderSubForest loc =
+        renderNode loc ++
+        maybeRenderSubForest (Z.next loc)
+
+    maybeRenderSubForest =
+        maybe mempty renderSubForest
+
+
+renderPrefix :: Z.TreePos Z.Full TreeView -> Trammel String
+renderPrefix =
+    mconcat . reverse . map prefix . zip [(1 :: Int)..] . Z.path
+  where
+    prefix (i, (_lhs, x, rhs)) = case x of
+        TVSearch _ -> ""
+        TVSearchResult _ -> spacePrefix
+        TVMessage _ ->
+            case i of
+                1 ->
+                    if null rhs
+                        then endPrefix
+                        else teePrefix
+                _ ->
+                    if null rhs
+                        then spacePrefix
+                        else pipePrefix
+        _ ->
+            if null $ filter isTVMessage $ map rootLabel rhs
+                then spacePrefix
+                else pipePrefix
+
+
+spacePrefix
+    , teePrefix
+    , pipePrefix
+    , endPrefix
+    :: Trammel String
+spacePrefix = prefixSGR "  "
+teePrefix   = prefixSGR "├╴"
+pipePrefix  = prefixSGR "│ "
+endPrefix   = prefixSGR "└╴"
 
 
 -- TODO locale-style: headerKey = \s -> SGR [..] (s <> ": ")
@@ -53,6 +107,7 @@ searchSGR
     , focusSGR
     , quoteSGR
     , boringSGR
+    , prefixSGR
     , dateSGR
     , tagsSGR
     , unreadMessageSGR
@@ -64,6 +119,7 @@ searchSGR = SGR [38,5,162]
 focusSGR = SGR [38,5,160]
 quoteSGR = SGR [38,5,242]
 boringSGR = SGR [38,5,240]
+prefixSGR = SGR [38,5,235]
 dateSGR = SGR [38,5,071]
 tagsSGR = SGR [38,5,036]
 killedTagSGR = SGR [38,5,088]

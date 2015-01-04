@@ -177,7 +177,7 @@ render q@State{..} =
       , headBuffer = newHeadBuf
       }
   where
-    newTreeBuf = renderTreeView now (Z.label cursor) (Z.toTree cursor)
+    newTreeBuf = renderTreeView now cursor (Z.root cursor)
     newHeadBuf =
         [ Plain (show screenWidth) <> "x" <> Plain (show screenHeight)
           <> " " <> Plain (show $ linearPos cursor - yoffset)

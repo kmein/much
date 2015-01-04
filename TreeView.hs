@@ -5,6 +5,7 @@
 module TreeView
     ( TreeView (..)
     , getMessage
+    , isTVMessage
     , isTVSearchResult
     , fromSearchResults
     , fromMessageForest
@@ -67,6 +68,12 @@ getMessage = \case
     TVMessageQuoteLine m _ _ _ -> Just m
     TVMessageLine m _ _ _ -> Just m
     _ -> Nothing
+
+
+isTVMessage :: TreeView -> Bool
+isTVMessage = \case
+    TVMessage _ -> True
+    _ -> False
 
 
 isTVSearchResult :: TreeView -> Bool
