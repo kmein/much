@@ -107,26 +107,20 @@ xconvHead m =
 
 
 xconvBody :: Message -> Forest TreeView
-xconvBody m = mconcat $ map (xconvPart m) (messageBody m)
-
-xconvPart :: Message -> MessagePart -> Forest TreeView
-xconvPart m p = xconvPartContent m p $ partContent p
-
-xconvPartContent
-  :: Message -> MessagePart -> MessageContent -> Forest TreeView
-xconvPartContent m p = \case
-    ContentText t ->
-        map (xconvLine m p) $ zip [0..] (T.lines t)
-    ContentMultipart parts ->
-        map (xconvPart2 m) parts
-        -- [Node (TVMessageLine m p 0 "ContentMultipart") []]
-    ContentMsgRFC822 _ ->
-        [Node (TVMessageLine m p 0 "ContentMsgRFC822") []]
+xconvBody m = map (xconvPart m) (messageBody m)
 
 
-xconvPart2 :: Message -> MessagePart -> Tree TreeView
-xconvPart2 m p =
-    Node (TVMessagePart m p) $ xconvPartContent m p (partContent p)
+xconvPart :: Message -> MessagePart -> Tree TreeView
+xconvPart m p =
+    Node (TVMessagePart m p) contents
+  where
+    contents = case partContent p of
+        ContentText t ->
+            map (xconvLine m p) $ zip [0..] (T.lines t)
+        ContentMultipart parts ->
+            map (xconvPart m) parts
+        ContentMsgRFC822 _ ->
+            []
 
 
 xconvLine
