@@ -128,6 +128,7 @@ startup q0 = do
     mapM_ killThread threadIds
 
 
+resetTerm :: State -> IO ()
 resetTerm State{..} = do
     hSetEcho stdin False
     hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decset) ++ "h"
@@ -255,6 +256,7 @@ mousemap info = \q ->
     return q { flashMessage = SGR [38,5,202] $ Plain $ show info }
 
 
+defaultMouse1Click :: Monad m => Int -> State -> m State
 defaultMouse1Click y q@State{..} = do
     let linearClickPos =
             let i = (y - length headBuffer + yoffset) - 1 {-zero-based-}
