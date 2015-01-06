@@ -237,6 +237,9 @@ keymap "\ESC[Z" = moveCursorUpToPrevUnread -- S-Tab
 keymap "\t" = moveCursorDownToNextUnread
 keymap "\DEL" = moveToParent  -- backspace
 
+keymap "\ESC[11~" = \q@State{..} ->
+    return q { flashMessage = Plain $ show $ treeViewId $ Z.label cursor }
+
 -- TODO Stuff Vim sends after exit (also there is more...)
 keymap "\ESC[2;2R" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
 keymap "\ESC[>85;95;0c" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }

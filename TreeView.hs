@@ -10,6 +10,7 @@ module TreeView
     , fromSearchResults
     , fromMessageForest
     , fromMessageTree
+    , treeViewId
     ) where
 
 
@@ -36,28 +37,44 @@ data TreeView
 
 
 instance Eq TreeView where
-    TVMessage m1 == TVMessage m2 =
-        m1 == m2
+    x1 == x2 = treeViewId x1 == treeViewId x2
 
-    TVMessageHeaderField m1 mhf1 == TVMessageHeaderField m2 mhf2 =
-        m1 == m2 && mhf1 == mhf2
 
-    TVMessagePart m1 mp1 == TVMessagePart m2 mp2 =
-        m1 == m2 && mp1 == mp2
+data TreeViewId
+    = TVIDMessage T.Text
+    | TVIDMessageHeaderField T.Text T.Text
+    | TVIDMessagePart T.Text Int
+    | TVIDMessageLine T.Text Int Int
+    | TVIDSearch T.Text
+    | TVIDSearchResult T.Text
+  deriving (Eq,Show)
 
-    TVMessageLine m1 mp1 ln1 _s1 == TVMessageLine m2 mp2 ln2 _s2 =
-        m1 == m2 && mp1 == mp2 && ln1 == ln2
 
-    TVMessageQuoteLine m1 mp1 ln1 _s1 == TVMessageQuoteLine m2 mp2 ln2 _s2 =
-        m1 == m2 && mp1 == mp2 && ln1 == ln2
+treeViewId :: TreeView -> TreeViewId
+treeViewId = \case
+    TVMessage m ->
+        TVIDMessage (fromMessage m)
 
-    TVSearch s1 == TVSearch s2 =
-        s1 == s2
+    TVMessageHeaderField m mhf ->
+        TVIDMessageHeaderField (fromMessage m) (CI.foldedCase mhf)
 
-    TVSearchResult s1 == TVSearchResult s2 =
-        s1 == s2
+    TVMessagePart m mp ->
+        TVIDMessagePart (fromMessage m) (partID mp)
 
-    _ == _ = False
+    TVMessageLine m mp lineNr _ ->
+        TVIDMessageLine (fromMessage m) (partID mp) lineNr
+
+    TVMessageQuoteLine m mp lineNr _ ->
+        TVIDMessageLine (fromMessage m) (partID mp) lineNr
+
+    TVSearch s ->
+        TVIDSearch (T.pack s)
+
+    TVSearchResult sr ->
+        TVIDSearch (T.pack $ unThreadID $ searchThread sr)
+
+  where
+    fromMessage = T.pack . unMessageID . messageId
 
 
 getMessage :: TreeView -> Maybe Message
