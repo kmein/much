@@ -6,6 +6,7 @@
 module TreeView
     ( TreeView (..)
     , getMessage
+    , getSearchTerm
     , isTVMessage
     , isTVSearchResult
     , fromSearchResults
@@ -90,6 +91,12 @@ getMessage = \case
     TVMessagePart m _ -> Just m
     TVMessageQuoteLine m _ _ _ -> Just m
     TVMessageLine m _ _ _ -> Just m
+    _ -> Nothing
+
+
+getSearchTerm :: TreeView -> Maybe String
+getSearchTerm = \case
+    TVSearch term -> Just term
     _ -> Nothing
 
 

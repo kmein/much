@@ -237,6 +237,17 @@ keymap "\ESC[Z" = moveCursorUpToPrevUnread -- S-Tab
 keymap "\t" = moveCursorDownToNextUnread
 keymap "\DEL" = moveToParent  -- backspace
 
+keymap "\ESCq" = \q@State{..} ->
+    let parse = filter (/='\n') -- TODO proper parse
+        draft = fromMaybe "" $ getSearchTerm $ Z.label $ Z.root cursor
+    in editString q draft >>= \case
+        Left err -> return q { flashMessage = Plain err }
+        Right s' -> Notmuch.search s' >>= \case
+            Left err ->
+                return q { flashMessage = Plain err }
+            Right result ->
+                return q { cursor = Z.fromTree $ fromSearchResults (parse s') result }
+
 keymap "\ESC[11~" = \q@State{..} ->
     return q { flashMessage = Plain $ show $ treeViewId $ Z.label cursor }
 
@@ -544,6 +555,24 @@ editTags q@State{..} = case Z.label cursor of
     select p loc =
         let root = Z.root loc
         in fromMaybe root $ findTree p root
+
+
+editString :: State -> String -> IO (Either String String)
+editString q s =
+    withTempFile' ".string" $ \(path, h) -> do
+        hPutStr stdout "\ESC[?1049h" -- TODO geht besser
+        hPutStr stdout "\ESC[?25l" -- TODO war mal besser
+        setFileMode path 0o600
+
+        hPutStr h s
+
+        hClose h
+
+        runEditor' path q >>= \case
+            ExitFailure code ->
+                return . Left $ "error exit code = " <> show code
+            ExitSuccess ->
+                Right <$> readFile path
 
 
 runEditor :: FilePath -> State -> IO State
