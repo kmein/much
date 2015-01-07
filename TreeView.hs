@@ -179,6 +179,7 @@ loadSubForest :: TreeView -> IO (Either String (Forest TreeView))
 loadSubForest = \case
     TVMessage m ->
         Right
+            . unloadPartsWithFilename
             . concatMap subForest
             . fromMessageForest
             . findFirsts messageMatch
@@ -188,10 +189,15 @@ loadSubForest = \case
         -- TODO parse --format=raw
         notmuchShowPart (termFromMessage m) (partID mp) >>= return . \case
             Left e -> Left $ show e
-            Right mp' -> Right $ subForest $ xconvPart m mp'
+            Right mp' ->
+                Right
+                    . unloadPartsWithFilename
+                    . subForest
+                    $ xconvPart m mp'
 
     TVSearchResult sr -> do
         Right
+            . unloadPartsWithFilename
             . map unloadReadSubForests
             . fromMessageForest
             <$> notmuchShow (termFromSearchResult sr)
@@ -244,6 +250,24 @@ unloadReadSubForests t = case rootLabel t of
                 map unloadReadSubForests $
                 subForest t
           }
+
+
+unloadPartsWithFilename :: Forest TreeView -> Forest TreeView
+unloadPartsWithFilename =
+    map (rewriteTree f)
+  where
+    f x@Node{..} = case rootLabel of
+      TVMessagePart _ mp ->
+          case partContentFilename mp of
+              Nothing -> x
+              Just _ ->
+                  x { subForest = [] }
+      _ -> x
+
+    rewriteTree :: (Tree a -> Tree a) -> Tree a -> Tree a
+    rewriteTree f x =
+        let x' = f x
+        in x' { subForest = map (rewriteTree f) $ subForest x' }
 
 
 findFirsts :: (a -> Bool) -> Forest a -> Forest a
