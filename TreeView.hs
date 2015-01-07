@@ -71,7 +71,7 @@ treeViewId = \case
         TVIDSearch (T.pack s)
 
     TVSearchResult sr ->
-        TVIDSearch (T.pack $ unThreadID $ searchThread sr)
+        TVIDSearchResult (T.pack $ unThreadID $ searchThread sr)
 
   where
     fromMessage = T.pack . unMessageID . messageId
