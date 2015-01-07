@@ -381,36 +381,22 @@ moveCursorDownToNextUnread =
     moveCursorToUnread findNext botOverrun moveTreeUp
 
 
+setSubForest :: Tree.Forest a -> Tree.Tree a -> Tree.Tree a
+setSubForest sf t = t { Tree.subForest = sf }
+
+
 toggleFold :: State -> IO State
-toggleFold q@State{..} = case Z.label cursor of
-    TVMessage _ -> do
-        q' <- toggleTagAtCursor "open" q
-
-        let Just sr = findParent isTVSearchResult cursor
-            TVSearchResult the_sr = Z.label sr
-            Notmuch.ThreadID tid = Notmuch.searchThread the_sr
-
-        t_ <- return . fromMessageForest =<< Notmuch.getThread tid
-
-        let cursor' = Z.modifyTree (\(Tree.Node l _) -> Tree.Node l t_) sr
-        return q' { cursor = select (==Z.label cursor) cursor' }
-
-    TVSearchResult sr -> do
-        let open = not $ null $ Tree.subForest $ Z.tree cursor
-        let Notmuch.ThreadID tid = Notmuch.searchThread sr
-
-        t_ <-
-            if open
-                then return []
-                else return . fromMessageForest =<< Notmuch.getThread tid
-
-        let cursor' = Z.modifyTree (\(Tree.Node l _) -> Tree.Node l t_) cursor
-        return q { cursor = select (==Z.label cursor) cursor' }
-
-    _ ->
-        return q { flashMessage = "nothing happened" }
+toggleFold q@State{..} =
+    getNewSubForest >>= return . \case
+        Left err ->
+            q { flashMessage = SGR [31] $ Plain err }
+        Right sf ->
+            q { cursor = Z.modifyTree (setSubForest sf) cursor }
   where
-    select p loc = fromMaybe (error "cannot select") $ findTree p $ Z.root loc
+    getNewSubForest =
+        if hasUnloadedSubForest (Z.tree cursor)
+            then loadSubForest (Z.label cursor)
+            else return $ Right $ unloadSubForest (Z.tree cursor)
 
 
 toggleTagAtCursor :: Tag -> State -> IO State

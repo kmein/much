@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 
 
 module TreeView
@@ -11,13 +12,18 @@ module TreeView
     , fromMessageForest
     , fromMessageTree
     , treeViewId
+    , loadSubForest
+    , unloadSubForest
+    , hasUnloadedSubForest
     ) where
 
 
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text as T
+import Control.Applicative
 import Data.Monoid
 import Data.Tree
+import Notmuch
 import Notmuch.Message
 import Notmuch.SearchResult
 
@@ -93,6 +99,12 @@ isTVMessage = \case
     _ -> False
 
 
+isTVMessagePart :: TreeView -> Bool
+isTVMessagePart = \case
+    TVMessagePart _ _ -> True
+    _ -> False
+
+
 isTVSearchResult :: TreeView -> Bool
 isTVSearchResult (TVSearchResult _) = True
 isTVSearchResult _ = False
@@ -109,16 +121,8 @@ fromMessageForest = map fromMessageTree
 
 fromMessageTree :: Tree Message -> Tree TreeView
 fromMessageTree (Node m ms) =
-    Node m' ms'
-  where
-
-    m' :: TreeView
-    m' = TVMessage m
-
-    ms' :: Forest TreeView
-    ms' = if isOpen m
-              then xconvHead m <> xconvBody m <> map fromMessageTree ms
-              else map fromMessageTree ms
+    Node (TVMessage m)
+         (xconvHead m <> xconvBody m <> map fromMessageTree ms)
 
 
 xconvHead :: Message -> Forest TreeView
@@ -164,3 +168,89 @@ isQuoteLine s0 = do
 
     -- /^\s*>/
     not (T.null s) && T.head s == '>'
+
+
+--
+-- Loading / Unloading
+--
+
+
+loadSubForest :: TreeView -> IO (Either String (Forest TreeView))
+loadSubForest = \case
+    TVMessage m ->
+        Right
+            . concatMap subForest
+            . fromMessageForest
+            . findFirsts messageMatch
+            <$> notmuchShow (termFromMessage m)
+
+    TVMessagePart m mp ->
+        -- TODO parse --format=raw
+        notmuchShowPart (termFromMessage m) (partID mp) >>= return . \case
+            Left e -> Left $ show e
+            Right mp' -> Right $ subForest $ xconvPart m mp'
+
+    TVSearchResult sr -> do
+        Right
+            . map unloadReadSubForests
+            . fromMessageForest
+            <$> notmuchShow (termFromSearchResult sr)
+
+    TVSearch s -> do
+        Right
+            . subForest
+            . fromSearchResults s
+            . either error id
+            <$> Notmuch.search s
+
+    _ ->
+        return $ Right []
+
+  where
+    termFromMessage = ("id:" <>) . unMessageID . messageId
+    termFromSearchResult = ("thread:" <>) . unThreadID . searchThread
+
+
+unloadSubForest :: Tree TreeView -> Forest TreeView
+unloadSubForest t = case rootLabel t of
+    TVMessage _ ->
+        filter (isTVMessage . rootLabel) $ subForest t
+    TVMessagePart _ _ ->
+        filter (isTVMessagePart . rootLabel) $ subForest t
+    _ ->
+        []
+
+
+hasUnloadedSubForest :: Tree TreeView -> Bool
+hasUnloadedSubForest t = case rootLabel t of
+    TVMessage _ ->
+        null $ filter (not . isTVMessage . rootLabel) $ subForest t
+    TVMessagePart _ _ ->
+        null $ filter (not . isTVMessagePart . rootLabel) $ subForest t
+    _ ->
+        null $ subForest t
+
+
+unloadReadSubForests :: Tree TreeView -> Tree TreeView
+unloadReadSubForests t = case rootLabel t of
+    TVMessage m | "unread" `notElem` messageTags m ->
+        t { subForest =
+                map unloadReadSubForests $
+                filter (isTVMessage . rootLabel) $
+                subForest t
+          }
+    _ ->
+        t { subForest =
+                map unloadReadSubForests $
+                subForest t
+          }
+
+
+findFirsts :: (a -> Bool) -> Forest a -> Forest a
+findFirsts p =
+    concatMap rec
+  where
+    rec t@Node{..} =
+      if p rootLabel
+          then [t]
+          else concatMap rec subForest

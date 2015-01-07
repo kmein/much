@@ -3,6 +3,7 @@
 module Notmuch where
 
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Lazy.Char8 as LBS8
 import Control.Concurrent
 import Control.DeepSeq (rnf)
 import Control.Exception
@@ -11,6 +12,7 @@ import Data.Monoid
 import Data.Tree
 import Notmuch.Message
 import Notmuch.SearchResult
+import System.Exit
 import System.IO
 import System.Process
 
@@ -63,11 +65,35 @@ notmuch args = do
     return output
 
 
+notmuch' :: [String] -> IO (ExitCode, LBS.ByteString, LBS.ByteString)
+notmuch' args = do
+    (_, Just hout, Just herr, ph) <-
+        createProcess (proc "notmuch" args)
+            { std_out = CreatePipe
+            , std_err = CreatePipe
+            }
+    out <- LBS.hGetContents hout
+    err <- LBS.hGetContents herr
 
---notmuch' args = do
---    (_, Just hout, _, _) <- createProcess (proc "notmuch" args)
---                                          { std_out = CreatePipe }
---    BS.hGetContents hout
+    withForkWait (evaluate $ rnf out) $ \waitOut -> do
+        withForkWait (evaluate $ rnf err) $ \waitErr -> do
+
+          ---- now write any input
+          --unless (null input) $
+          --  ignoreSigPipe $ hPutStr inh input
+          -- hClose performs implicit hFlush, and thus may trigger a SIGPIPE
+          --ignoreSigPipe $ hClose inh
+
+          -- wait on the output
+          waitOut
+          waitErr
+          hClose hout
+          hClose herr
+
+    -- wait on the process
+    exitCode <- waitForProcess ph
+
+    return (exitCode, out, err)
 
 
 search :: String -> IO (Either String [SearchResult])
@@ -99,6 +125,18 @@ notmuchShow term = do
     -- TODO why head?
     return $ threadForest $ head $
         either error id (eitherDecode' c')
+
+
+notmuchShowPart :: String -> Int -> IO (Either String MessagePart)
+notmuchShowPart term partId = do
+    -- TODO handle partId == 0 and partId > N
+    (exitCode, out, err) <-
+        notmuch' [ "show", "--format=json", "--format-version=2"
+                 , "--part=" <> show partId
+                 , term ]
+    return $ case exitCode of
+        ExitSuccess -> eitherDecode' out
+        _ -> Left $ show exitCode <> ": " <> LBS8.unpack err
 
 
 setTag :: String -> String -> IO LBS.ByteString

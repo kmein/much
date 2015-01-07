@@ -110,8 +110,3 @@ parseTree vs@(Array _) = do
     (msg, Thread t) <- parseJSON vs
     return $ TR.Node msg t
 parseTree _ = fail "Tree is not an array"
-
-
--- message utilities
-isOpen :: Message -> Bool
-isOpen m = "open" `elem` messageTags m
