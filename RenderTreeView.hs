@@ -170,7 +170,8 @@ renderTreeView1 now hasFocus x = case x of
             t = Plain $ T.unpack $ CI.original $ Notmuch.partContentType p
             filename = maybe "" (Plain . (" "<>) . show) $ Notmuch.partContentFilename p
             charset = maybe "" (Plain . (" "<>) . show) $ Notmuch.partContentCharset p
-        in c $ "part#" <> i <> " " <> t <> filename <> charset
+            size = Plain $ show $ Notmuch.contentSize (Notmuch.partContent p)
+        in c $ "part#" <> i <> " " <> t <> filename <> charset <> " " <> size
 
     TVMessageQuoteLine _ _ _ s ->
         if hasFocus

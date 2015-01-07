@@ -40,6 +40,12 @@ instance Eq MessagePart where
     a == b = partID a == partID b
 
 
+contentSize :: MessageContent -> Int
+contentSize (ContentText text) = T.length text
+contentSize (ContentMultipart parts) = sum $ map (contentSize . partContent) parts
+contentSize (ContentMsgRFC822 xs) = sum $ map (sum . map (contentSize . partContent) . snd) xs
+
+
 parseRFC822 :: V.Vector Value -> Parser MessageContent
 parseRFC822 lst = ContentMsgRFC822 . V.toList <$> V.mapM p lst
     where
