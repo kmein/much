@@ -187,6 +187,7 @@ loadSubForest = \case
     TVMessage m ->
         Right
             . unloadPartsWithFilename
+            . map unloadReadSubForests
             . concatMap subForest
             . fromMessageForest
             . findFirsts messageMatch
