@@ -2,36 +2,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Notmuch where
 
---import Language.Haskell.TH.Ppr (bytesToString)
-import Data.Aeson
---import Data.List.Split
---import Data.Attoparsec.ByteString hiding (try)
-import Data.Maybe
-import Data.Monoid
-import Data.String
---import Data.Traversable
-import Data.Tree
---import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
---import qualified Data.ByteString.Char8 as BS8
---import qualified Data.Text.Lazy as TL
-import qualified Data.Text as T
---import qualified Data.Text.Encoding as T
-import qualified Data.Text.IO as T
---import Data.Version (Version(..), parseVersion)
-import System.Process
---import System.IO
-import qualified Data.Map as M
-
-import Notmuch.SearchResult
-import Notmuch.Message
-
-
 import Control.Concurrent
---import Control.Concurrent.MVar
-import Control.Exception
-import System.IO
 import Control.DeepSeq (rnf)
+import Control.Exception
+import Data.Aeson
+import Data.Monoid
+import Data.Tree
+import Notmuch.Message
+import Notmuch.SearchResult
+import System.IO
+import System.Process
 
 
 -- | Fork a thread while doing something else, but kill it if there's an
@@ -111,18 +92,13 @@ notmuchReply replyTo term =
  --       >>= return . eitherDecode'
 
 
-getThread :: String -> IO (Forest Message)
-getThread tid = do
+notmuchShow :: String -> IO (Forest Message)
+notmuchShow term = do
     c' <- notmuch [ "show", "--format=json", "--format-version=2"
-                   , "thread:" <> tid ]
-
-    let threads = case eitherDecode' c' :: Either String [Thread] of
-                      Left err -> error err
-                      Right x -> x
-        --threadsF = map threadForest threads
-        ttt = threadForest $ head $ threads
-    return ttt
-
+                   , term ]
+    -- TODO why head?
+    return $ threadForest $ head $
+        either error id (eitherDecode' c')
 
 
 setTag :: String -> String -> IO LBS.ByteString
