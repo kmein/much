@@ -252,6 +252,15 @@ keymap "\ESCq" = \q@State{..} ->
 keymap "\ESC[11~" = \q@State{..} ->
     return q { flashMessage = Plain $ show $ treeViewId $ Z.label cursor }
 
+keymap "\ESC[12~" = \q@State{..} ->
+    return q { flashMessage =
+                  Plain $
+                  show $
+                  maybe Nothing (Just . Notmuch.messageFilename) $
+                  getMessage $
+                  Z.label cursor
+              }
+
 -- TODO Stuff Vim sends after exit (also there is more...)
 keymap "\ESC[2;2R" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
 keymap "\ESC[>85;95;0c" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
