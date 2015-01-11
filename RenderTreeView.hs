@@ -124,6 +124,7 @@ dateSGR = SGR [38,5,071]
 tagsSGR = SGR [38,5,036]
 killedTagSGR = SGR [38,5,088]
 starTagSGR = SGR [38,5,226]
+draftTagSGR = SGR [38,5,202]
 
 boringMessageSGR = SGR [38,5,023]
 unreadMessageSGR = SGR [38,5,117]
@@ -211,6 +212,7 @@ renderTags =
 
 renderTag :: Tag -> Trammel String
 renderTag tag = case tag of
+    "draft" -> draftTagSGR plain
     "killed" -> killedTagSGR plain
     "star" -> starTagSGR plain
     _ -> plain
