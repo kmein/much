@@ -125,6 +125,7 @@ tagsSGR = SGR [38,5,036]
 killedTagSGR = SGR [38,5,088]
 starTagSGR = SGR [38,5,226]
 
+boringMessageSGR = SGR [38,5,023]
 unreadMessageSGR = SGR [38,5,117]
 unreadSearchSGR = SGR [38,5,250]
 
@@ -147,14 +148,15 @@ renderTreeView1 now hasFocus x = case x of
         in c $ subj <> " " <> date <> " " <> tags
 
     TVMessage m ->
-        let c = if hasFocus then focusSGR else
+        let fromSGR =
+                if hasFocus then focusSGR else
                     if "unread" `elem` Notmuch.messageTags m
                         then unreadMessageSGR
-                        else boringSGR
-            from = renderFrom (M.lookup "from" $ Notmuch.messageHeaders m)
+                        else boringMessageSGR
+            from = fromSGR $ renderFrom (M.lookup "from" $ Notmuch.messageHeaders m)
             date = dateSGR $ renderDate now x
             tags = tagsSGR $ renderTags (Notmuch.messageTags m) -- TODO filter common tags
-        in c $ from <> " " <> date <> " " <> tags
+        in from <> " " <> date <> " " <> tags
 
     TVMessageHeaderField m fieldName ->
         let c = if hasFocus then focusSGR else boringSGR
