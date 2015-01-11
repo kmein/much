@@ -21,7 +21,10 @@ let
       cabalInstall
       aeson
       caseInsensitive
+      email-header
       friendly-time
+      mime
+      mime-mail # because modified showAddress
       process
       rosezipper
       safe
@@ -32,7 +35,9 @@ let
 
   hsPkgs = pkgs.haskellPackages_ghc783_profiling.override {
     extension = self: super: with self; {
+      email-header = callPackage ./nix/email-header.nix {};
       friendly-time = callPackage ./nix/friendly-time {};
+      mime-mail = callPackage ./nix/mime-mail.nix {};
     };
   };
 

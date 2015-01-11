@@ -4,6 +4,7 @@
 
 module Main (main) where
 
+import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Tree as Tree
@@ -449,7 +450,30 @@ replyToAll q@State{..} = case getMessage (Z.label cursor) of
                                   Plain $ "notmuch exit code = " ++ show code
                              }
                 ExitSuccess ->
-                    runEditor path q
+                    runEditor' path q >>= \case
+                        ExitFailure code ->
+                            return q { flashMessage = Plain $ "editor exit code = " ++ show code }
+                        ExitSuccess -> do
+                            x <- LBS.readFile path
+                            -- TODO use TagOps
+                            Notmuch.notmuchWithInput
+                                [ "insert"
+                                , "--no-hooks"
+                                , "+draft"
+                                -- TODO dont hardcode which tags to delete
+                                , "-inbox"
+                                , "-unread"
+                                ]
+                                -- TODO rename to draftPath
+                                x >>= \case
+                                    (ExitFailure code, _, _) ->
+                                        return q { flashMessage =
+                                            Plain $ "notmuch insert exit code = " ++ show code
+                                        }
+                                    _ ->
+                                        toggleFold q {
+                                            flashMessage = "draft created"
+                                        }
 
 
 viewSource :: State -> IO State

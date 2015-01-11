@@ -96,6 +96,44 @@ notmuch' args = do
     return (exitCode, out, err)
 
 
+notmuchWithInput
+    :: [String]
+    -> LBS.ByteString
+    -> IO (ExitCode, LBS.ByteString, LBS.ByteString)
+notmuchWithInput args input = do
+    (Just hin, Just hout, Just herr, ph) <-
+        createProcess (proc "notmuch" args)
+            { std_in = CreatePipe
+            , std_out = CreatePipe
+            , std_err = CreatePipe
+            }
+    LBS.hPut hin input
+    hClose hin
+
+    out <- LBS.hGetContents hout
+    err <- LBS.hGetContents herr
+
+    withForkWait (evaluate $ rnf out) $ \waitOut -> do
+        withForkWait (evaluate $ rnf err) $ \waitErr -> do
+
+          ---- now write any input
+          --unless (null input) $
+          --  ignoreSigPipe $ hPutStr inh input
+          -- hClose performs implicit hFlush, and thus may trigger a SIGPIPE
+          --ignoreSigPipe $ hClose inh
+
+          -- wait on the output
+          waitOut
+          waitErr
+          hClose hout
+          hClose herr
+
+    -- wait on the process
+    exitCode <- waitForProcess ph
+
+    return (exitCode, out, err)
+
+
 search :: String -> IO (Either String [SearchResult])
 search term =
     notmuch [ "search", "--format=json", "--format-version=2", term ]
