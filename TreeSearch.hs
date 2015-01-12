@@ -43,18 +43,18 @@ findPrev loc =
 
 
 
-findNextN :: Int -> TreePos Full a -> TreePos Full a
+findNextN :: Eq a => Int -> TreePos Full a -> TreePos Full a
 findNextN n loc
     | n <= 0 = loc
     | otherwise =
-        maybe loc (findNextN $ n - 1) (findNext loc)
+        maybe loc (findNextN $ n - 1) (skipSame findNext loc)
 
 
-findPrevN :: Int -> TreePos Full a -> TreePos Full a
+findPrevN :: Eq a => Int -> TreePos Full a -> TreePos Full a
 findPrevN n loc
     | n <= 0 = loc
     | otherwise =
-        maybe loc (findPrevN $ n - 1) (findPrev loc)
+        maybe loc (findPrevN $ n - 1) (skipSame findPrev loc)
 
 
 
@@ -72,3 +72,18 @@ linearPos =
     rec i loc = case findPrev loc of
         Just loc' -> rec (i + 1) loc'
         Nothing -> i
+
+
+
+skipSame
+    :: Eq a =>
+      (TreePos Full a -> Maybe (TreePos Full a)) ->
+      TreePos Full a ->
+      Maybe (TreePos Full a)
+skipSame next loc =
+    case next loc of
+        Nothing -> Nothing
+        Just loc' ->
+            if label loc' == label loc
+                then skipSame next loc'
+                else Just loc'
