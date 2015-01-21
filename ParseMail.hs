@@ -110,7 +110,10 @@ fromMIMEValue val =
               }
         _ ->
             m { M.mailHeaders =
-                  (CI.original k, LT.toStrict $ LT.decodeUtf8 v) :
+                  ( CI.original k
+                  , either "I am made of stupid" LT.toStrict $
+                      LT.decodeUtf8' v
+                  ) :
                   M.mailHeaders m
               }
 
