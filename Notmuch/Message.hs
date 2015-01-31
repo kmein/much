@@ -9,6 +9,7 @@ import Data.Time.Calendar
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
 import Data.Monoid
+import Notmuch.Class
 import qualified Data.Text as T
 import qualified Data.Map as M
 import qualified Data.CaseInsensitive as CI
@@ -87,6 +88,9 @@ data Message = Message {
 instance Eq Message where
     a == b = messageId a == messageId b
 
+
+instance HasNotmuchId Message where
+    notmuchId = unMessageID . messageId
 
 
 instance FromJSON Message where

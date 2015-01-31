@@ -10,11 +10,13 @@ import Control.Exception
 import Data.Aeson
 import Data.Monoid
 import Data.Tree
+import Notmuch.Class
 import Notmuch.Message
 import Notmuch.SearchResult
 import System.Exit
 import System.IO
 import System.Process
+import TagUtils
 
 
 -- | Fork a thread while doing something else, but kill it if there's an
@@ -177,11 +179,6 @@ notmuchShowPart term partId = do
         _ -> Left $ show exitCode <> ": " <> LBS8.unpack err
 
 
-setTag :: String -> String -> IO LBS.ByteString
-setTag tag i = do
-    notmuch [ "tag", "+" <> tag , i ]
-
-
-unsetTag :: String -> String -> IO LBS.ByteString
-unsetTag tag i = do
-    notmuch [ "tag", "-" <> tag , i ]
+notmuchTag :: HasNotmuchId a => [TagOp] -> a -> IO ()
+notmuchTag tagOps x =
+    notmuch ("tag" : tagOpsToArgs tagOps ++ [notmuchId x]) >> return ()

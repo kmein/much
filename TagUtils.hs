@@ -12,7 +12,7 @@ import Data.Monoid
 import Data.Tree
 import Notmuch.Message
 import Notmuch.SearchResult
-import TreeView
+import TreeView.Types
 
 
 type Tag = T.Text

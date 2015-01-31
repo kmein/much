@@ -422,18 +422,28 @@ toggleFold q@State{..} =
 
 toggleTagAtCursor :: Tag -> State -> IO State
 toggleTagAtCursor tag q@State{..} = case Z.label cursor of
+
+    TVSearchResult sr -> do
+        let tagOp =
+                if tag `elem` Notmuch.searchTags sr
+                    then DelTag
+                    else AddTag
+            tagOps = [tagOp tag]
+        Notmuch.notmuchTag tagOps sr
+        -- TODO reload or patch whole thread
+        let cursor' = Z.modifyTree (patchRootLabelTags tagOps) cursor
+        return q { cursor = cursor' }
+
     TVMessage m -> do
         -- TODO modify search result tags
-        -- TODO check Notmuch.{set,unset}Tag result
-        if tag `elem` Notmuch.messageTags m
-            then do
-                Notmuch.unsetTag (T.unpack tag) (Notmuch.unMessageID $ Notmuch.messageId m)
-                let cursor' = Z.modifyTree (patchRootLabelTags [DelTag tag]) cursor
-                return q { cursor = cursor' }
-            else do
-                Notmuch.setTag (T.unpack tag) (Notmuch.unMessageID $ Notmuch.messageId m)
-                let cursor' = Z.modifyTree (patchRootLabelTags [AddTag tag]) cursor
-                return q { cursor = cursor' }
+        let tagOp =
+                if tag `elem` Notmuch.messageTags m
+                    then DelTag
+                    else AddTag
+            tagOps = [tagOp tag]
+        Notmuch.notmuchTag tagOps m
+        let cursor' = Z.modifyTree (patchRootLabelTags tagOps) cursor
+        return q { cursor = cursor' }
 
     _ -> return q { flashMessage = "nothing happened" }
 

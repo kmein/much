@@ -7,6 +7,7 @@ import Data.Aeson
 import Data.Text
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
+import Notmuch.Class
 
 
 newtype ThreadID = ThreadID { unThreadID :: String }
@@ -31,6 +32,10 @@ data SearchResult = SearchResult {
 instance Eq SearchResult where
     s1 == s2 =
         searchThread s1 == searchThread s2
+
+
+instance HasNotmuchId SearchResult where
+    notmuchId = unThreadID . searchThread
 
 
 instance FromJSON SearchResult where
