@@ -35,6 +35,7 @@ import TagUtils
 import Trammel
 import TreeSearch
 import TreeView
+import TreeZipperUtils (modifyFirstParentLabelWhere)
 import Utils
 
 
@@ -430,19 +431,21 @@ toggleTagAtCursor tag q@State{..} = case Z.label cursor of
                     else AddTag
             tagOps = [tagOp tag]
         Notmuch.notmuchTag tagOps sr
-        -- TODO reload or patch whole thread
-        let cursor' = Z.modifyTree (patchRootLabelTags tagOps) cursor
+        let cursor' = Z.modifyTree (patchTreeTags tagOps) cursor
         return q { cursor = cursor' }
 
     TVMessage m -> do
-        -- TODO modify search result tags
         let tagOp =
                 if tag `elem` Notmuch.messageTags m
                     then DelTag
                     else AddTag
             tagOps = [tagOp tag]
         Notmuch.notmuchTag tagOps m
-        let cursor' = Z.modifyTree (patchRootLabelTags tagOps) cursor
+        let cursor' =
+                -- TODO this needs a nice name
+                modifyFirstParentLabelWhere isTVSearchResult f $
+                Z.modifyLabel f cursor
+            f = patchTags tagOps
         return q { cursor = cursor' }
 
     _ -> return q { flashMessage = "nothing happened" }
