@@ -179,9 +179,9 @@ notmuchShowPart term partId = do
 
 setTag :: String -> String -> IO LBS.ByteString
 setTag tag i = do
-    notmuch [ "tag", "+" <> tag , "id:" <> i ]
+    notmuch [ "tag", "+" <> tag , i ]
 
 
 unsetTag :: String -> String -> IO LBS.ByteString
 unsetTag tag i = do
-    notmuch [ "tag", "-" <> tag , "id:" <> i ]
+    notmuch [ "tag", "-" <> tag , i ]

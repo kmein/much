@@ -34,7 +34,7 @@ instance Eq SearchResult where
 
 
 instance FromJSON SearchResult where
-    parseJSON (Object v) = SearchResult <$> v .: "thread"
+    parseJSON (Object v) = SearchResult <$> ((ThreadID . ("thread:"++)) <$> v .: "thread")
                                         <*> (posixSecondsToUTCTime . fromInteger <$> v .: "timestamp")
                                         <*> v .: "date_relative"
                                         <*> v .:? "subject" .!= ""

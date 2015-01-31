@@ -448,7 +448,7 @@ replyToAll q@State{..} = case getMessage (Z.label cursor) of
             (_, _, _, procH) <-
                 withFile "/dev/null" ReadMode $ \nullH ->
                     createProcess
-                        (proc "notmuch" [ "reply" , "id:" ++ msgId ])
+                        (proc "notmuch" [ "reply" , msgId ])
                             { std_in = UseHandle nullH
                             , std_out = UseHandle draftH
                             }
@@ -496,7 +496,7 @@ viewSource q@State{..} = case getMessage (Z.label cursor) of
             (_, _, _, procH) <-
                 withFile "/dev/null" ReadMode $ \nullH ->
                     createProcess
-                        (proc "notmuch" [ "show", "--format=raw", "id:" ++ msgId ])
+                        (proc "notmuch" [ "show", "--format=raw", msgId ])
                             { std_in = UseHandle nullH
                             , std_out = UseHandle draftH
                             }
@@ -516,7 +516,7 @@ editTags q@State{..} = case Z.label cursor of
     TVSearchResult sr -> do
         edit
             (Notmuch.searchTags sr)
-            ("thread:" <> (Notmuch.unThreadID $ Notmuch.searchThread sr))
+            (Notmuch.unThreadID $ Notmuch.searchThread sr)
             (\tagOps loc ->
                 Z.modifyTree (patchTreeTags tagOps) loc
             )
@@ -524,7 +524,7 @@ editTags q@State{..} = case Z.label cursor of
     TVMessage m -> do
         edit
             (Notmuch.messageTags m)
-            ("id:" <> (Notmuch.unMessageID $ Notmuch.messageId m)) -- TODO describe war besser
+            (Notmuch.unMessageID $ Notmuch.messageId m) -- TODO describe war besser
             (\tagOps mloc ->
                 -- TODO this needs test cases
                 let

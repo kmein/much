@@ -221,8 +221,8 @@ loadSubForest = \case
         return $ Right []
 
   where
-    termFromMessage = ("id:" <>) . unMessageID . messageId
-    termFromSearchResult = ("thread:" <>) . unThreadID . searchThread
+    termFromMessage = unMessageID . messageId
+    termFromSearchResult = unThreadID . searchThread
 
 
 unloadSubForest :: Tree TreeView -> Forest TreeView

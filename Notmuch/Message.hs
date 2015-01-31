@@ -90,7 +90,7 @@ instance Eq Message where
 
 
 instance FromJSON Message where
-    parseJSON (Object v) = Message <$> v .: "id"
+    parseJSON (Object v) = Message <$> (MessageID . ("id:"<>) <$> v .: "id")
                                    <*> (posixSecondsToUTCTime . fromInteger <$> v .: "timestamp")
                                    <*> (M.mapKeys CI.mk <$> v .: "headers")
                                    <*> v .: "body"
