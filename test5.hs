@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Main (main) where
+module Main (main, mainWithArgs) where
 
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
@@ -25,6 +25,7 @@ import Event
 import RenderTreeView (renderTreeView)
 import Scanner (scan)
 import System.Directory
+import System.Console.Docopt (getArgWithDefault, optionsWithUsage, shortOption)
 import System.Environment
 import System.Exit
 import System.IO
@@ -54,11 +55,8 @@ data State = State
     , decrst :: [Int]
     }
 
-
-initState :: IO State
-initState = do
-    let query = "tag:inbox AND NOT tag:killed"
-
+initState :: String -> IO State
+initState query = do
     r_ <- either error id <$> Notmuch.search query
 
     return State
@@ -84,7 +82,26 @@ initState = do
 
 main :: IO ()
 main =
-    bracket initState cleanup startup
+    getArgs >>= mainWithArgs
+
+
+mainWithArgs :: [String] -> IO ()
+mainWithArgs args = do
+    args' <- optionsWithUsage usage args
+    let query = getArgWithDefault args' defaultSearch (shortOption 'q')
+    bracket (initState query) cleanup startup
+  where
+    usage = unlines
+      [ "Command-line MUA using notmuch."
+      , ""
+      , "Usage:"
+      , "  much [-q <search-term>]"
+      , ""
+      , "Options:"
+      , "  -q <search-term>, --query=<search-term>"
+      , "        Open specific search, defaults to " ++ (show defaultSearch)
+      ]
+    defaultSearch = "tag:inbox AND NOT tag:killed"
 
 
 cleanup :: State -> IO ()

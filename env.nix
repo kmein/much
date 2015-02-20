@@ -20,6 +20,7 @@ let
       aeson
       cabal-install
       case-insensitive
+      docopt
       email-header
       friendly-time
       mime
