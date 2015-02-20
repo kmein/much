@@ -9,3 +9,7 @@ clean:
 .PHONY: install
 install:
 	nix-env --arg target "$$(cabal2nix .)" -f install.nix -i
+
+.PHONY: install-env
+install-env:
+	nix-env -f env.nix -i
