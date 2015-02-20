@@ -1,8 +1,8 @@
 { nixpkgs ? import <nixpkgs> {} }:
 
 let
-  name = "much";
-  version = "1";
+  pname = "much";
+  version = "2";
 
   buildInputs = with pkgs; [
     hsEnv
@@ -15,12 +15,11 @@ let
   '';
 
   # ghcWithPackagesOld b/c terminfo collision
-  hsEnv = hsPkgs.ghcWithPackagesOld (self: with self;
-    terminfo.nativeBuildInputs ++
+  hsEnv = hsPkgs.ghcWithPackages (self: with self;
     [
-      cabalInstall
       aeson
-      caseInsensitive
+      cabal-install
+      case-insensitive
       email-header
       friendly-time
       mime
@@ -29,14 +28,13 @@ let
       rosezipper
       safe
       split
-      terminalSize
+      terminal-size
     ]
   );
 
-  hsPkgs = pkgs.haskellPackages_ghc783_profiling.override {
-    extension = self: super: with self; {
+  hsPkgs = pkgs.haskellngPackages.override {
+    overrides = self: super: with self; {
       email-header = callPackage ./nix/email-header.nix {};
-      friendly-time = callPackage ./nix/friendly-time {};
       mime-mail = callPackage ./nix/mime-mail.nix {};
     };
   };
@@ -58,7 +56,7 @@ let
   #}}}
 
 in pkgs.myEnvFun {
-  name = "${name}-${version}";
+  name = "${pname}-${version}";
   inherit buildInputs extraCmds;
 }
 # vim: set fdm=marker :

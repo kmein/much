@@ -3,11 +3,12 @@
 , name ? "much"
 }:
 let
-  inherit (pkgs.haskellPackages) buildLocalCabalWithArgs callPackage;
+  inherit (pkgs.haskellngPackages) buildLocalCabalWithArgs callPackage;
 in
 buildLocalCabalWithArgs {
   inherit src name;
   args = {
-    friendlyTime = callPackage ./nix/friendly-time {};
+    email-header = callPackage ./nix/email-header.nix {};
+    mime-mail = callPackage ./nix/mime-mail.nix {};
   };
 }
