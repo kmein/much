@@ -46,8 +46,9 @@ fromMIMEValue val =
         case mime_val_content val of
             Single content ->
                 M.Part
-                    { M.partType = "text/plain"
-                    , M.partEncoding = M.None
+                    -- TODO actually check if we're utf-8 or ascii(?)
+                    { M.partType = "text/plain; charset=utf-8"
+                    , M.partEncoding = M.QuotedPrintableText
                     , M.partFilename = Nothing
                     , M.partHeaders = []
                     , M.partContent = LT.encodeUtf8 $ LT.fromStrict content
