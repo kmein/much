@@ -9,6 +9,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
+import qualified Network.Mail.Mime as M
 import qualified Notmuch
 import qualified Notmuch.Message as Notmuch
 import qualified Notmuch.SearchResult as Notmuch
@@ -22,6 +23,7 @@ import Data.Maybe
 import Data.Monoid
 import Data.Time
 import Event
+import ParseMail (readMail)
 import RenderTreeView (renderTreeView)
 import Scanner (scan)
 import System.Directory
@@ -29,6 +31,7 @@ import System.Console.Docopt (getArgWithDefault, optionsWithUsage, shortOption)
 import System.Environment
 import System.Exit
 import System.IO
+import System.Locale (defaultTimeLocale, rfc822DateFormat)
 import System.Posix.Files
 import System.Posix.Signals
 import System.Process
@@ -493,7 +496,13 @@ replyToAll q@State{..} = case getMessage (Z.label cursor) of
                         ExitFailure code ->
                             return q { flashMessage = Plain $ "editor exit code = " ++ show code }
                         ExitSuccess -> do
-                            x <- LBS.readFile path
+                            -- TODO check if path has been written to,
+                            --      else abort
+                            draft <-
+                                M.renderMail' =<<
+                                addDateHeader =<<
+                                return . readMail =<<
+                                T.readFile path
                             -- TODO use TagOps
                             Notmuch.notmuchWithInput
                                 [ "insert"
@@ -503,8 +512,7 @@ replyToAll q@State{..} = case getMessage (Z.label cursor) of
                                 , "-inbox"
                                 , "-unread"
                                 ]
-                                -- TODO rename to draftPath
-                                x >>= \case
+                                draft >>= \case
                                     (ExitFailure code, _, _) ->
                                         return q { flashMessage =
                                             Plain $ "notmuch insert exit code = " ++ show code
@@ -660,3 +668,17 @@ withTempFile' s f = do
     logname <- getEnv "LOGNAME"
     tmpdir <- getTemporaryDirectory
     withTempFile tmpdir (logname ++ "_much_" ++ s) f
+
+
+addDateHeader m@M.Mail{..} = do
+    t <- getCurrentTime
+    return m
+        { M.mailHeaders =
+            ( "Date"
+            , T.pack $
+              formatTime defaultTimeLocale
+                         rfc822DateFormat
+                         t
+            ) :
+            mailHeaders
+        }

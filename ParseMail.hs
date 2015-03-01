@@ -29,9 +29,9 @@ data Address = Mailbox M.Address | Group T.Text [M.Address]
 
 
 
-readMail :: FilePath -> IO M.Mail
-readMail p =
-    fromMIMEValue . parseMIMEMessage <$> T.readFile p
+readMail :: T.Text -> M.Mail
+readMail =
+    fromMIMEValue . parseMIMEMessage
 
 
 fromMIMEValue :: MIMEValue -> M.Mail
