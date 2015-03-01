@@ -33,14 +33,6 @@ readMail :: FilePath -> IO M.Mail
 readMail p =
     fromMIMEValue . parseMIMEMessage <$> T.readFile p
 
---meh0 :: IO M.Mail
---meh0 = 
---    return . xxx . parseMIMEMessage =<< T.readFile "/home/tv/tmp/testmail"
---
---meh :: IO ()
---meh = 
---    LBS8.putStr =<< M.renderMail' =<< return . xxx . parseMIMEMessage =<< T.readFile "/home/tv/tmp/testmail"
---
 
 fromMIMEValue :: MIMEValue -> M.Mail
 fromMIMEValue val =
@@ -111,8 +103,10 @@ fromMIMEValue val =
         _ ->
             m { M.mailHeaders =
                   ( CI.original k
-                  , either "I am made of stupid" LT.toStrict $
-                      LT.decodeUtf8' v
+                  , either
+                      (const "I am made of stupid")
+                      LT.toStrict
+                      (LT.decodeUtf8' v)
                   ) :
                   M.mailHeaders m
               }
@@ -120,20 +114,12 @@ fromMIMEValue val =
 
 parseAddress :: BS.ByteString -> Either String Address
 parseAddress =
-    (\x0 -> case x0 of
-        A8.Done "" r -> Right r
-        x -> Left $ show x
-    ) .
-    A8.parse (P.cfws *> address <* A8.endOfInput)
+    A8.parseOnly (P.cfws *> address <* A8.endOfInput)
 
 
 parseAddresses :: BS.ByteString -> Either String [Address]
 parseAddresses =
-    (\x0 -> case x0 of
-        A8.Done "" r -> Right r
-        x -> Left $ show x
-    ) .
-    A8.parse (P.cfws *> address `A8.sepBy1` A8.char ',' <* A8.endOfInput)
+    A8.parseOnly (P.cfws *> address `A8.sepBy1` A8.char ',' <* A8.endOfInput)
 
 
 fromMIMEParams :: [MIMEParam] -> H.Headers
@@ -214,7 +200,7 @@ localPart =
 domain :: A8.Parser T.Text
 domain =
     (A8.<?> "domain") $
-    mconcat <$> (subDomain `A8.sepBy1` A8.char '.')
+    T.intercalate "." <$> (subDomain `A8.sepBy1` A8.char '.')
 
 -- sub-domain  =  domain-ref / domain-literal
 subDomain :: A8.Parser T.Text
