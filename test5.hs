@@ -26,6 +26,7 @@ import Event
 import ParseMail (readMail)
 import RenderTreeView (renderTreeView)
 import Scanner (scan)
+import Safe
 import System.Directory
 import System.Console.Docopt (getArgWithDefault, optionsWithUsage, shortOption)
 import System.Environment
@@ -682,3 +683,25 @@ addDateHeader m@M.Mail{..} = do
             ) :
             mailHeaders
         }
+
+prompt :: String -> IO (Either ExitCode String)
+prompt ps =
+    withTempFile' "prompt" $ \(path, h_tempFile) -> do
+        mapM_ (hPutStrLn h_tempFile) $ "" : map comment (lines ps)
+        hClose h_tempFile
+        editor <- getEnv "EDITOR"
+        runInteractive editor [path] >>= \case
+            ExitSuccess -> Right . removeComments <$> readFile path
+            code -> return (Left code)
+  where
+    comment = ("# "++)
+    removeComments =
+        unlines .
+        filter (maybe True (/='#') . headMay) .
+        lines
+
+
+runInteractive :: FilePath -> [String] -> IO ExitCode
+runInteractive cmd args = do
+    (_, _, _, h_proc) <- createProcess (proc cmd args)
+    waitForProcess h_proc
