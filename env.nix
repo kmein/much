@@ -23,6 +23,8 @@ let
       docopt
       email-header
       friendly-time
+      hsemail
+      mbox
       mime
       mime-mail # because modified showAddress
       process
