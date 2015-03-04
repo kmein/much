@@ -28,6 +28,8 @@ import Codec.MIME.Type
 import Codec.MIME.Decode
 import Control.Arrow(second)
 
+import           Data.CaseInsensitive   (CI)
+import qualified Data.CaseInsensitive as CI
 import Data.Char
 import Data.Maybe
 import qualified Data.List as L
@@ -44,7 +46,7 @@ doTrace | enableTrace = trace
 
 
 parseMIMEBody :: [MIMEParam] -> T.Text -> MIMEValue
-parseMIMEBody headers_in body = result { mime_val_headers = headers }
+parseMIMEBody headers body = result { mime_val_headers = headers }
   where
   result = case mimeType mty of
     Multipart{} -> fst (parseMultipart mty body)
@@ -53,7 +55,6 @@ parseMIMEBody headers_in body = result { mime_val_headers = headers }
                                  , mime_val_disp    = parseContentDisp headers
                                  , mime_val_content = Single (processBody headers body)
                                  }
-  headers = [ MIMEParam (T.toLower k) v | (MIMEParam k v) <- headers_in ]
   mty = fromMaybe defaultType
                        (parseContentType =<< lookupField "content-type" (paramPairs headers))
 defaultType :: Type
@@ -66,32 +67,31 @@ parseContentDisp headers =
     (processDisp . dropFoldingWSP) =<< lookupField "content-disposition" (paramPairs headers)
   where
     processDisp t | T.null t  = Nothing
-                  | T.null bs = Just $ Disposition { dispType = toDispType (T.toLower as)
+                  | T.null bs = Just $ Disposition { dispType = toDispType as
                                                    , dispParams = []
                                                    }
-                  | otherwise = Just $ Disposition { dispType = toDispType (T.toLower as)
+                  | otherwise = Just $ Disposition { dispType = toDispType as
                                                    , dispParams = processParams (parseParams bs)
                                                    } 
       where (as,bs) = T.break (\ch -> isSpace ch || ch == ';') t
 
     processParams = map procP
       where
-        procP (MIMEParam as val)
-            | "name" == asl              = Name val
-            | "filename" == asl          = Filename val
-            | "creation-date" == asl     = CreationDate val
-            | "modification-date" == asl = ModDate val
-            | "read-date" == asl         = ReadDate val
-            | "size" == asl              = Size val
-            | otherwise                  = OtherParam asl val
-          where asl = T.toLower as
+        procP (MIMEParam k val)
+            | "name" == k              = Name val
+            | "filename" == k          = Filename val
+            | "creation-date" == k     = CreationDate val
+            | "modification-date" == k = ModDate val
+            | "read-date" == k         = ReadDate val
+            | "size" == k              = Size val
+            | otherwise                = OtherParam k val
 
     toDispType t = if t == "inline" then DispInline
                    else if t == "attachment" then DispAttachment
                    else if t == "form-data"  then DispFormData
                    else  DispOther t
 
-paramPairs :: [MIMEParam] -> [(T.Text, T.Text)]
+paramPairs :: [MIMEParam] -> [(CI T.Text, T.Text)]
 paramPairs = map paramPair
   where
     paramPair (MIMEParam a b) = (a,b)
@@ -117,7 +117,7 @@ parseMIMEMessage entity =
 parseHeaders :: T.Text -> ([MIMEParam], T.Text)
 parseHeaders str =
   case findFieldName "" str of
-    Left (nm, rs) -> parseFieldValue nm (dropFoldingWSP rs)
+    Left (nm, rs) -> parseFieldValue (CI.mk nm) (dropFoldingWSP rs)
     Right body    -> ([],body)
  where
   findFieldName acc t 
@@ -183,21 +183,21 @@ parseMIMEType = parseContentType
 parseContentType :: T.Text -> Maybe Type
 parseContentType str
     | T.null minor0 = doTrace ("unable to parse content-type: " ++ show str) $ Nothing
-    | otherwise     = Just Type  { mimeType = toType maj as
+    | otherwise     = Just Type  { mimeType = toType (CI.mk maj) as
                                  , mimeParams = parseParams (T.dropWhile isHSpace bs)
                                  }
   where
     (maj, minor0) = T.break (=='/') (dropFoldingWSP str)
     minor = T.drop 1 minor0
     (as, bs) = T.break (\ ch -> isHSpace ch || isTSpecial ch) minor 
-    toType a b = case lookupField (T.toLower a) mediaTypes of
+    toType a b = case lookupField a mediaTypes of
          Just ctor -> ctor b
          _ -> Other a b
 
 parseParams :: T.Text -> [MIMEParam]
 parseParams t   | T.null t          = []
                 | ';' == T.head t   = let (nm_raw, vs0) = T.break (=='=') (dropFoldingWSP $ T.tail t) 
-                                          nm = T.toLower nm_raw in
+                                          nm = CI.mk nm_raw in
                     if T.null vs0 
                         then []
                         else let vs = T.tail vs0 in
@@ -211,7 +211,7 @@ parseParams t   | T.null t          = []
                                     MIMEParam nm val : parseParams (T.dropWhile isHSpace zs)
                 | otherwise = doTrace ("Codec.MIME.Parse.parseParams: curious param value -- " ++ show t) []
 
-mediaTypes :: [(T.Text, T.Text -> MIMEType)]
+mediaTypes :: [(CI T.Text, T.Text -> MIMEType)]
 mediaTypes =
   [ ("multipart",   (Multipart . toMultipart))
   , ("application", Application)
@@ -222,11 +222,11 @@ mediaTypes =
   , ("text",        Text)
   , ("video",       Video)
   ]
- where toMultipart b = fromMaybe other (lookupField (T.toLower b) multipartTypes)
+ where toMultipart b = fromMaybe other (lookupField (CI.mk b) multipartTypes)
           where other | T.isPrefixOf "x-" b = Extension b
                       | otherwise           = OtherMulti b
 
-multipartTypes :: [(T.Text, Multipart)]
+multipartTypes :: [(CI T.Text, Multipart)]
 multipartTypes =
   [ ("alternative", Alternative)
   , ("byteranges",  Byteranges)
@@ -283,7 +283,7 @@ takeUntilCRLF str = go "" str
             | otherwise = go (T.take 1 t <> acc) $ T.tail t
 
 -- case in-sensitive lookup of field names or attributes\/parameters.
-lookupField :: T.Text -> [(T.Text,a)] -> Maybe a
+lookupField :: CI T.Text -> [(CI T.Text,a)] -> Maybe a
 lookupField n ns = 
    -- assume that inputs have been mostly normalized already 
    -- (i.e., lower-cased), but should the lookup fail fall back
@@ -291,6 +291,5 @@ lookupField n ns =
   case lookup n ns of
     x@Just{} -> x
     Nothing  -> 
-      let nl = T.toLower n in
-      fmap snd $ L.find ((nl==) . T.toLower . fst) ns
+      fmap snd $ L.find ((n==) . fst) ns
       

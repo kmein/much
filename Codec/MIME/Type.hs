@@ -15,10 +15,12 @@
 --------------------------------------------------------------------
 module Codec.MIME.Type where
 
+import           Data.CaseInsensitive   (CI)
+import qualified Data.CaseInsensitive as CI
 import qualified Data.Text as T
 import Data.Monoid ((<>))
 
-data MIMEParam = MIMEParam  { paramName     :: T.Text
+data MIMEParam = MIMEParam  { paramName     :: CI T.Text
                             , paramValue    :: T.Text }
     deriving (Show, Ord, Eq)
 
@@ -40,7 +42,7 @@ showType t = showMIMEType (mimeType t) <> showMIMEParams (mimeParams t)
 showMIMEParams :: [MIMEParam] -> T.Text
 showMIMEParams ps = T.concat $ map showP ps
   where 
-    showP (MIMEParam a b) = "; " <> a <> "=\"" <> b <> "\""
+    showP (MIMEParam k v) = "; " <> CI.original k <> "=\"" <> v <> "\""
 
 
 data MIMEType
@@ -52,7 +54,7 @@ data MIMEType
  | Multipart   Multipart
  | Text        TextType
  | Video       SubType
- | Other       {otherType :: T.Text, otherSubType :: SubType}
+ | Other       {otherType :: CI T.Text, otherSubType :: SubType}
    deriving ( Show, Ord, Eq )
 
 showMIMEType :: MIMEType -> T.Text
@@ -66,7 +68,7 @@ showMIMEType t =
    Multipart s   -> "multipart/"<>showMultipart s
    Text s        -> "text/"<>s
    Video s       -> "video/"<>s
-   Other a b     -> a <> "/" <> b
+   Other a b     -> CI.original a <> "/" <> b
 
 -- | a (type, subtype) MIME pair.
 data MIMEPair
@@ -183,5 +185,5 @@ data DispParam
  | ModDate T.Text
  | ReadDate T.Text
  | Size T.Text
- | OtherParam T.Text T.Text
+ | OtherParam (CI T.Text) T.Text
    deriving ( Show, Eq)
