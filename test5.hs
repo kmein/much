@@ -4,7 +4,9 @@
 
 module Main (main, mainWithArgs) where
 
-import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString as BS
+import           Data.CaseInsensitive   (CI)
+import qualified Data.CaseInsensitive as CI
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Tree as Tree
@@ -18,6 +20,7 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
+import Data.Foldable (foldrM)
 import Data.List (intercalate)
 import Data.Maybe
 import Data.Monoid
@@ -236,6 +239,7 @@ redraw q@State{..} = do
 
 keymap :: String -> State -> IO State
 
+keymap "A" = attachFilesToDraft
 keymap "a" = toggleTagAtCursor "inbox"
 keymap "s" = toggleTagAtCursor "unread"
 keymap "&" = toggleTagAtCursor "killed"
@@ -472,6 +476,67 @@ toggleTagAtCursor tag q@State{..} = case Z.label cursor of
     _ -> return q { flashMessage = "nothing happened" }
 
 
+attachFilesToDraft :: State -> IO State
+attachFilesToDraft q@State{..} = case getMessage (Z.label cursor) of
+    Nothing ->
+        return q { flashMessage = "no message" }
+    Just m -> do
+        let msgId = Notmuch.unMessageID $ Notmuch.messageId m
+        filenames <- either (const []) lines <$> prompt "add files"
+        Notmuch.notmuchShowMail msgId >>= \case
+            Left err ->
+                return q { flashMessage = Plain $ "Error: " ++ show err }
+            Right mail ->
+                    return mail
+                >>= return . removeHeaders -- TODO mk unforgettable
+                    [ "Content-Type"
+                    , "Content-Transfer-Encoding"
+                    , "MIME-Version"
+                    ]
+                >>= attachFiles filenames
+                >>= return . removeHeader "Date"
+                >>= addDateHeader
+                >>= M.renderMail'
+                >>= Notmuch.notmuchWithInput
+                    [ "insert"
+                    , "--no-hooks"
+                    -- TODO dont hardcode which tags (and use TagOps)
+                    , "+draft"
+                    , "+attachment"
+                    , "-inbox"
+                    , "-unread"
+                    ]
+                >>= \case
+                    (ExitFailure code, _, _) ->
+                        return q { flashMessage =
+                            Plain $ "notmuch insert exit code = " ++ show code
+                        }
+                    _ ->
+                        return q { flashMessage = "draft created" }
+
+
+attachFiles :: [FilePath] -> M.Mail -> IO M.Mail
+attachFiles filenames mail0 =
+    foldrM attachFile mail0 filenames
+
+
+attachFile :: FilePath -> M.Mail -> IO M.Mail
+attachFile filePath mail = do
+    fileType <- fromMaybe "application/octet-stream" <$> getFileType filePath
+    M.addAttachment (T.pack fileType) filePath mail
+
+
+getFileType :: FilePath -> IO (Maybe String)
+getFileType path =
+    -- XXX GNU file's exit code is 0 even if path doesn't exist
+    doesFileExist path >>= \case
+        True -> do
+            (_, out, _) <- readProcessWithExitCode "file" ["-Lib", path] ""
+            return $ Just (init out)
+        False ->
+            return Nothing
+
+
 replyToAll :: State -> IO State
 replyToAll q@State{..} = case getMessage (Z.label cursor) of
     Nothing ->
@@ -671,6 +736,7 @@ withTempFile' s f = do
     withTempFile tmpdir (logname ++ "_much_" ++ s) f
 
 
+addDateHeader :: M.Mail -> IO M.Mail
 addDateHeader m@M.Mail{..} = do
     t <- getCurrentTime
     return m
@@ -683,6 +749,14 @@ addDateHeader m@M.Mail{..} = do
             ) :
             mailHeaders
         }
+
+removeHeader :: CI BS.ByteString -> M.Mail -> M.Mail
+removeHeader h m@M.Mail{..} =
+    m { M.mailHeaders = filter (\(k, _) -> CI.mk k /= h) mailHeaders }
+
+removeHeaders :: [CI BS.ByteString] -> M.Mail -> M.Mail
+removeHeaders hs m@M.Mail{..} =
+    m { M.mailHeaders = filter (\(k, _) -> CI.mk k `notElem` hs) mailHeaders }
 
 prompt :: String -> IO (Either ExitCode String)
 prompt ps =

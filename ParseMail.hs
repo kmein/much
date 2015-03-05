@@ -9,7 +9,6 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT
 import qualified Network.Email.Header.Parser as P
@@ -55,7 +54,7 @@ fromMIMEValue val =
                     }
             _ -> error ("meh: " ++ show val)
 
-    f :: H.Header -> M.Mail -> M.Mail
+    --f :: H.Header -> M.Mail -> M.Mail
     f (k, v) m = case k of
         "from" ->
             m { M.mailFrom =
@@ -126,7 +125,7 @@ parseAddresses =
 fromMIMEParams :: [MIMEParam] -> H.Headers
 fromMIMEParams =
     map $ \(MIMEParam k v) ->
-        (CI.mk $ T.encodeUtf8 k, LT.encodeUtf8 $ LT.fromStrict v)
+        (CI.mk $ T.encodeUtf8 $ CI.original k, LT.encodeUtf8 $ LT.fromStrict v)
 
 
 -- TODO we should probably use email-header

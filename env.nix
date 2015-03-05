@@ -25,12 +25,13 @@ let
       friendly-time
       hsemail
       mbox
-      mime
       mime-mail # because modified showAddress
+      multipart
       process
       rosezipper
       safe
       split
+      temporary
       terminal-size
     ]
   );

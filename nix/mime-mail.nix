@@ -7,8 +7,8 @@ mkDerivation {
   version = "0.4.6.2";
   src = fetchgit {
     url = "https://github.com/4z3/mime-mail";
-    sha256 = "00xlibw1rdaj71y1r7qhb8ypw5prbzyz4z3rynmv9gbxrp1kz0hw";
-    rev = "be4ec1958dac85bde01ae3433cb387810585c5fd";
+    sha256 = "fa2ecb7ca0f71513a8f4dde897ff910d94a205c4a81c6b5e107e4712438b0446";
+    rev = "3d0f060fb4c58b69c72ce3b4911bff32df7329a7";
   };
   buildDepends = [
     base base64-bytestring blaze-builder bytestring filepath process

@@ -1,9 +1,12 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Notmuch where
 
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.Char8 as LBS8
+import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy.Encoding as LT
+import qualified Network.Mail.Mime as M
 import Control.Concurrent
 import Control.DeepSeq (rnf)
 import Control.Exception
@@ -13,6 +16,7 @@ import Data.Tree
 import Notmuch.Class
 import Notmuch.Message
 import Notmuch.SearchResult
+import ParseMail (readMail)
 import System.Exit
 import System.IO
 import System.Process
@@ -177,6 +181,19 @@ notmuchShowPart term partId = do
     return $ case exitCode of
         ExitSuccess -> eitherDecode' out
         _ -> Left $ show exitCode <> ": " <> LBS8.unpack err
+
+
+notmuchShowMail :: String -> IO (Either String M.Mail)
+notmuchShowMail term =
+    notmuch' [ "show", "--format=raw", "--format-version=2", term ]
+    >>= return . \case
+      (ExitSuccess, out, _) ->
+          case LT.decodeUtf8' out of
+              Right x -> Right (readMail $ LT.toStrict x)
+              Left ex -> Left $ "meh" ++ show ex
+      (exitCode, _, err) ->
+          Left $ "notmuch failed with exit code " ++ show exitCode ++
+                 ": " ++ LBS8.unpack err
 
 
 notmuchTag :: HasNotmuchId a => [TagOp] -> a -> IO ()
