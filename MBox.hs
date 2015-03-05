@@ -58,6 +58,7 @@ toForest mbox =
     msgs = unpackMBox mbox
 
 
+-- TODO finde a new home for roots
 roots :: Ord a => Map a (Set a) -> Set a
 roots refs =
     Set.unions $ Map.elems $ Map.filter p refs
@@ -66,6 +67,7 @@ roots refs =
     p = Set.null . Set.intersection messageIDs
 
 
+-- TODO finde a new home for sortTree
 sortTree :: Tree Message -> Tree Message
 sortTree t =
     Tree.Node (Tree.rootLabel t) $

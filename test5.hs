@@ -309,9 +309,11 @@ keymap "\ESCq" = \q@State{..} ->
             Right result ->
                 return q { cursor = Z.fromTree $ fromSearchResults (parse s') result }
 
+-- <F1>
 keymap "\ESC[11~" = \q@State{..} ->
     return q { flashMessage = Plain $ show $ treeViewId $ Z.label cursor }
 
+-- <F2>
 keymap "\ESC[12~" = \q@State{..} ->
     return q { flashMessage =
                   Plain $
