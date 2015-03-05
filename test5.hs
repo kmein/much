@@ -40,6 +40,8 @@ import System.Posix.Files
 import System.Posix.Signals
 import System.Process
 import TagUtils
+import Text.Hyphenation
+import Text.LineBreak
 import Trammel
 import TreeSearch
 import TreeView
@@ -263,6 +265,38 @@ keymap "\n" = toggleFold
 keymap "\ESC[Z" = moveCursorUpToPrevUnread -- S-Tab
 keymap "\t" = moveCursorDownToNextUnread
 keymap "\DEL" = moveToParent  -- backspace
+
+-- TODO wrap/unwrap to separate module
+keymap "=" = \q@State{..} ->
+    let cursor' = case Z.label cursor of
+            TVMessageLine a b c s ->
+                wrap (TVMessageLine a b c) cursor s
+            _ -> cursor
+    in return q { cursor = cursor' }
+  where
+
+    --unwrap = error "WIP"
+        -- 1. get current id (must be TVMessageLine)
+        -- 2. find first adjoined TVMessageLine with same id
+        -- 3. find last adjoined TVMessageLine with same id
+        -- 4. join lines (with space?)
+
+    wrap ctor loc s =
+        fromMaybe (error "die hard") $
+        Z.nextTree $
+        foldr (insert . ctor)
+              (Z.delete loc)
+              $ hy s
+
+    insert a =
+        Z.prevSpace . Z.insert (Tree.Node a [])
+
+    hy s =
+        breakStringLn bf s
+      where
+        shy = '\173'
+        hyp = Just german_1996
+        bf = BreakFormat 80 8 shy hyp
 
 keymap "\ESCq" = \q@State{..} ->
     let parse = filter (/='\n') -- TODO proper parse

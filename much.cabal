@@ -19,6 +19,8 @@ executable much
                 , docopt >=0.6 && <0.7
                 , email-header
                 , friendly-time >=0.3 && <0.4
+                , hyphenation >=0.4 && < 0.5
+                , linebreak >=1.0 && <1.1
                 , mime-mail
                 , old-locale
                 , process >=1.2 && <1.3

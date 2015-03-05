@@ -24,6 +24,7 @@ let
       email-header
       friendly-time
       hsemail
+      linebreak
       mbox
       mime-mail # because modified showAddress
       multipart
