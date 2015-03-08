@@ -105,7 +105,9 @@ instance FromJSON Message where
     parseJSON (Array _) = return $ Message (MessageID "") defTime M.empty [] True False [] ""
         where defTime = UTCTime (ModifiedJulianDay 0) (fromInteger 0)
     parseJSON x = fail $ "Error parsing message: " ++ show x
-
+
+hasTag :: T.Text -> Message -> Bool
+hasTag tag = (tag `elem`) . messageTags
 
 
 

@@ -5,6 +5,7 @@
 module Main (main, mainWithArgs) where
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy.Char8 as LBS8
 import           Data.CaseInsensitive   (CI)
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text as T
@@ -20,6 +21,8 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Except
 import Data.Foldable (foldrM)
 import Data.List (intercalate)
 import Data.Maybe
@@ -48,6 +51,22 @@ import TreeView
 import TreeZipperUtils (modifyFirstParentLabelWhere)
 import Utils
 
+import Control.DeepSeq (rnf)
+
+-- | Fork a thread while doing something else, but kill it if there's an
+-- exception.
+--
+-- This is important in the cases above because we want to kill the thread
+-- that is holding the Handle lock, because when we clean up the process we
+-- try to close that handle, which could otherwise deadlock.
+--
+withForkWait :: IO () -> (IO () ->  IO a) -> IO a
+withForkWait async body = do
+  waitVar <- newEmptyMVar :: IO (MVar (Either SomeException ()))
+  mask $ \restore -> do
+    tid <- forkIO $ try (restore async) >>= putMVar waitVar
+    let wait = takeMVar waitVar >>= either throwIO return
+    restore (body wait) `onException` killThread tid
 
 
 data State = State
@@ -513,42 +532,121 @@ toggleTagAtCursor tag q@State{..} = case Z.label cursor of
 
 
 attachFilesToDraft :: State -> IO State
-attachFilesToDraft q@State{..} = case getMessage (Z.label cursor) of
-    Nothing ->
-        return q { flashMessage = "no message" }
-    Just m -> do
-        let msgId = Notmuch.unMessageID $ Notmuch.messageId m
-        filenames <- either (const []) lines <$> prompt "add files"
-        Notmuch.notmuchShowMail msgId >>= \case
-            Left err ->
-                return q { flashMessage = Plain $ "Error: " ++ show err }
-            Right mail ->
-                    return mail
-                >>= return . removeHeaders -- TODO mk unforgettable
-                    [ "Content-Type"
-                    , "Content-Transfer-Encoding"
-                    , "MIME-Version"
-                    ]
-                >>= attachFiles filenames
-                >>= return . removeHeader "Date"
-                >>= return . addDateHeader now
-                >>= M.renderMail'
-                >>= Notmuch.notmuchWithInput
-                    [ "insert"
-                    , "--no-hooks"
-                    -- TODO dont hardcode which tags (and use TagOps)
-                    , "+draft"
-                    , "+attachment"
-                    , "-inbox"
-                    , "-unread"
-                    ]
-                >>= \case
-                    (ExitFailure code, _, _) ->
-                        return q { flashMessage =
-                            Plain $ "notmuch insert exit code = " ++ show code
-                        }
-                    _ ->
-                        return q { flashMessage = "draft created" }
+attachFilesToDraft q0 =
+    runExceptT (go q0) >>= return . \result ->
+        q0 { flashMessage = Plain (show result) }
+  where
+    go :: State -> ExceptT String IO String
+    go State{cursor=cursor,now=now} = do
+        msg <- maybe (throwE "not a message") return $
+            getMessage (Z.label cursor)
+
+        unless (Notmuch.hasTag "draft" msg) $
+            throwE "message has no draft tag"
+
+        paths <- filter (not . null) . lines <$> promptE "add files"
+        when (null paths) (throwE "Aborted")
+
+        newTags <-
+            lines . LBS8.unpack . fst <$>
+            readNotmuchE ["config", "get", "new.tags"] ""
+
+        let tagOps =
+                map AddTag ("attachment" : Notmuch.messageTags msg) ++
+                map DelTag (map T.pack newTags)
+
+        loadMailE (Notmuch.messageId msg)
+
+            >>= attachFilesE paths
+                -- ^ this will catch invalid paths
+                -- TODO if it fails, then re-prompt
+
+            >>= return . (addDateHeader now . removeHeader "Date")
+
+            >>= liftE . M.renderMail' . removeHeaders
+                [ "Content-Type"
+                , "Content-Transfer-Encoding"
+                , "MIME-Version"
+                ]
+            >>= readNotmuchE ("insert" : "--no-hooks" : tagOpsToArgs tagOps)
+            >>  liftE (removeFile $ Notmuch.messageFilename msg)
+            >>  readNotmuchE ["new", "--no-hooks", "--quiet"] ""
+
+            >>  return "files attached"
+
+
+readNotmuchE
+    :: [String]
+    -> LBS8.ByteString
+    -> ExceptT String IO (LBS8.ByteString, LBS8.ByteString)
+readNotmuchE args input = do
+    (exitCode, out, err) <- liftE $ do
+        (Just hin, Just hout, Just herr, ph) <-
+            createProcess (proc "notmuch" args)
+                { std_in = CreatePipe
+                , std_out = CreatePipe
+                , std_err = CreatePipe
+                }
+        LBS8.hPut hin input
+        hClose hin
+
+        out <- LBS8.hGetContents hout
+        err <- LBS8.hGetContents herr
+
+        withForkWait (evaluate $ rnf out) $ \waitOut -> do
+            withForkWait (evaluate $ rnf err) $ \waitErr -> do
+
+              ---- now write any input
+              --unless (null input) $
+              --  ignoreSigPipe $ hPutStr inh input
+              -- hClose performs implicit hFlush, and thus may trigger a SIGPIPE
+              --ignoreSigPipe $ hClose inh
+
+              -- wait on the output
+              waitOut
+              waitErr
+              hClose hout
+              hClose herr
+
+        -- wait on the process
+        exitCode <- waitForProcess ph
+
+        return (exitCode, out, err)
+
+    case exitCode of
+        ExitSuccess -> return (out, err)
+        ExitFailure code ->
+            throwE $ "notmuch " ++ intercalate " " args ++
+                     " exit code: " ++ show code ++ "; stderr:\n" ++
+                     LBS8.unpack err
+
+
+liftE :: IO a -> ExceptT String IO a
+liftE io =
+    lift (try io) >>= either (throwE . transformException) return
+  where
+    transformException :: IOException -> String
+    transformException = ("IO: "++) . show
+
+
+
+promptE :: String -> ExceptT String IO String
+promptE ps =
+    liftE (prompt ps) >>= \case
+        Right r -> return r
+        Left code -> throwE $ "prompt error: " ++ show code
+
+
+loadMailE :: Notmuch.MessageID -> ExceptT String IO M.Mail
+loadMailE msgId =
+    liftE (Notmuch.notmuchShowMail $ Notmuch.unMessageID msgId) >>= \case
+        Right m -> return m
+        Left err -> throwE $ "load mail error: " ++ show err
+
+
+attachFilesE :: [FilePath] -> M.Mail -> ExceptT String IO M.Mail
+attachFilesE paths =
+    liftE . attachFiles paths
 
 
 attachFiles :: [FilePath] -> M.Mail -> IO M.Mail
