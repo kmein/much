@@ -23,6 +23,7 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
+import Data.Aeson (eitherDecode')
 import Data.Foldable (foldrM)
 import Data.List (intercalate)
 import Data.Maybe
@@ -39,7 +40,6 @@ import System.Environment
 import System.Exit
 import System.IO
 import System.Locale (defaultTimeLocale, rfc822DateFormat)
-import System.Posix.Files
 import System.Posix.Signals
 import System.Process
 import TagUtils
@@ -317,16 +317,7 @@ keymap "=" = \q@State{..} ->
         hyp = Just german_1996
         bf = BreakFormat 80 8 shy hyp
 
-keymap "\ESCq" = \q@State{..} ->
-    let parse = filter (/='\n') -- TODO proper parse
-        draft = fromMaybe "" $ getSearchTerm $ Z.label $ Z.root cursor
-    in editString q draft >>= \case
-        Left err -> return q { flashMessage = Plain err }
-        Right s' -> Notmuch.search s' >>= \case
-            Left err ->
-                return q { flashMessage = Plain err }
-            Right result ->
-                return q { cursor = Z.fromTree $ fromSearchResults (parse s') result }
+keymap "\ESCq" = editSearchTerm
 
 -- <F1>
 keymap "\ESC[11~" = \q@State{..} ->
@@ -636,6 +627,13 @@ editMailE ps =
         Left code -> throwE $ "edit mail error: " ++ show code
 
 
+editStringE :: String -> ExceptT String IO String
+editStringE s =
+    liftE (editString s) >>= \case
+        Right r -> return r
+        Left code -> throwE $ "edit string error: " ++ show code
+
+
 editTagsE :: [Tag] -> ExceptT String IO [TagOp]
 editTagsE ps =
     liftE (editTags ps) >>= \case
@@ -737,6 +735,29 @@ viewSource q0 =
         liftE (readFile $ Notmuch.messageFilename msg) >>= viewMailE
 
 
+editSearchTerm :: State -> IO State
+editSearchTerm q0 =
+    runExceptT (go q0) >>= return . \case
+        Right q' -> q'
+        Left err -> q0 { flashMessage = Plain $ "error: " ++ show err }
+  where
+    go :: State -> ExceptT String IO State
+    go q@State{..} = do
+
+        let parse = filter (/='\n') -- TODO proper parse
+            s = fromMaybe "" $ getSearchTerm $ Z.label $ Z.root cursor
+
+        s' <- editStringE s
+
+        result <-
+            either throwE return . eitherDecode' . fst =<<
+            readNotmuchE ["search", "--format=json", "--format-version=2", s'] ""
+            -- ^ TODO duplicates Notmuch.search
+
+        return q { cursor = Z.fromTree $ fromSearchResults (parse s') result }
+
+
+
 editTagsAtCursor :: State -> IO State
 editTagsAtCursor q0 =
     runExceptT (go q0) >>= return . \case
@@ -800,31 +821,6 @@ select p loc =
     in fromMaybe root $ findTree p root
 
 
-editString :: State -> String -> IO (Either String String)
-editString q s =
-    withTempFile' ".string" $ \(path, h) -> do
-        hPutStr stdout "\ESC[?1049h" -- TODO geht besser
-        hPutStr stdout "\ESC[?25l" -- TODO war mal besser
-        setFileMode path 0o600
-
-        hPutStr h s
-
-        hClose h
-
-        runEditor' path q >>= \case
-            ExitFailure code ->
-                return . Left $ "error exit code = " <> show code
-            ExitSuccess ->
-                Right <$> readFile path
-
-
-
-runEditor' :: [Char] -> State -> IO ExitCode
-runEditor' path q@State{..} = do
-    editor <- getEnv "EDITOR"
-    system (editor ++ " " ++ path) <* resetTerm q
-
-
 withTempFile' :: FilePath -> ((FilePath, Handle) -> IO a) -> IO a
 withTempFile' s f = do
     logname <- getEnv "LOGNAME"
@@ -855,6 +851,17 @@ removeHeaders hs m@M.Mail{..} =
 editMail :: String -> IO (Either ExitCode String)
 editMail s =
     withTempFile' "edit.mail" $ \(path, h_tempFile) -> do
+        hPutStr h_tempFile s
+        hClose h_tempFile
+        editor <- getEnv "EDITOR"
+        runInteractive editor [path] >>= \case
+            ExitSuccess -> Right <$> readFile path
+            code -> return (Left code)
+
+
+editString :: String -> IO (Either ExitCode String)
+editString s =
+    withTempFile' "edit.string" $ \(path, h_tempFile) -> do
         hPutStr h_tempFile s
         hClose h_tempFile
         editor <- getEnv "EDITOR"
