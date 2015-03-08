@@ -636,6 +636,13 @@ editMailE ps =
         Left code -> throwE $ "edit mail error: " ++ show code
 
 
+viewMailE :: String -> ExceptT String IO ()
+viewMailE ps =
+    liftE (viewMail ps) >>= \case
+        Right r -> return r
+        Left code -> throwE $ "view mail error: " ++ show code
+
+
 promptE :: String -> ExceptT String IO String
 promptE ps =
     liftE (prompt ps) >>= \case
@@ -712,28 +719,15 @@ replyToAll q0 =
 
 
 viewSource :: State -> IO State
-viewSource q@State{..} = case getMessage (Z.label cursor) of
-    Nothing ->
-        return q { flashMessage = "no message" }
-    Just m -> do
-        let msgId = Notmuch.unMessageID $ Notmuch.messageId m
-        withTempFile' "raw.mail" $ \(path, draftH) -> do
-            setFileMode path 0o400
-            (_, _, _, procH) <-
-                withFile "/dev/null" ReadMode $ \nullH ->
-                    createProcess
-                        (proc "notmuch" [ "show", "--format=raw", msgId ])
-                            { std_in = UseHandle nullH
-                            , std_out = UseHandle draftH
-                            }
-            hClose draftH
-            waitForProcess procH >>= \case
-                ExitFailure code ->
-                    return q { flashMessage =
-                                  Plain $ "notmuch exit code = " ++ show code
-                             }
-                ExitSuccess ->
-                    runEditor path q
+viewSource q0 =
+    runExceptT (go q0) >>= return . \result ->
+        q0 { flashMessage = Plain (show result) }
+  where
+    go State{cursor=cursor} = do
+        msg <- maybe (throwE "not a message") return $
+            getMessage (Z.label cursor)
+
+        liftE (readFile $ Notmuch.messageFilename msg) >>= viewMailE
 
 
 -- TODO editTags is too convoluted
@@ -834,16 +828,6 @@ editString q s =
                 Right <$> readFile path
 
 
-runEditor :: FilePath -> State -> IO State
-runEditor path q@State{..} =
-    runEditor' path q >>= \case
-        ExitFailure code ->
-            return q { flashMessage =
-                          Plain $ "editor exit code = " ++ show code
-                     }
-        ExitSuccess ->
-            return q
-
 
 runEditor' :: [Char] -> State -> IO ExitCode
 runEditor' path q@State{..} = do
@@ -887,6 +871,18 @@ editMail s =
         runInteractive editor [path] >>= \case
             ExitSuccess -> Right <$> readFile path
             code -> return (Left code)
+
+
+viewMail :: String -> IO (Either ExitCode ())
+viewMail s = do
+    pager <- getEnv "PAGER"
+    (Just h_in, _, _, h_proc) <-
+        createProcess (shell pager) { std_in = CreatePipe }
+    hPutStr h_in s
+    hClose h_in
+    waitForProcess h_proc >>= \case
+        ExitSuccess -> return (Right ())
+        code -> return (Left code)
 
 
 prompt :: String -> IO (Either ExitCode String)
