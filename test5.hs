@@ -531,7 +531,7 @@ attachFilesToDraft q@State{..} = case getMessage (Z.label cursor) of
                     ]
                 >>= attachFiles filenames
                 >>= return . removeHeader "Date"
-                >>= addDateHeader
+                >>= return . addDateHeader now
                 >>= M.renderMail'
                 >>= Notmuch.notmuchWithInput
                     [ "insert"
@@ -602,7 +602,7 @@ replyToAll q@State{..} = case getMessage (Z.label cursor) of
                             --      else abort
                             draft <-
                                 M.renderMail' =<<
-                                addDateHeader =<<
+                                return . addDateHeader now =<<
                                 return . readMail =<<
                                 T.readFile path
                             -- TODO use TagOps
@@ -772,19 +772,17 @@ withTempFile' s f = do
     withTempFile tmpdir (logname ++ "_much_" ++ s) f
 
 
-addDateHeader :: M.Mail -> IO M.Mail
-addDateHeader m@M.Mail{..} = do
-    t <- getCurrentTime
-    return m
-        { M.mailHeaders =
-            ( "Date"
-            , T.pack $
-              formatTime defaultTimeLocale
-                         rfc822DateFormat
-                         t
-            ) :
-            mailHeaders
-        }
+addDateHeader :: UTCTime -> M.Mail -> M.Mail
+addDateHeader t m@M.Mail{..} = do
+    m { M.mailHeaders =
+          ( "Date"
+          , T.pack $
+            formatTime defaultTimeLocale
+                       rfc822DateFormat
+                       t
+          ) :
+          mailHeaders
+      }
 
 removeHeader :: CI BS.ByteString -> M.Mail -> M.Mail
 removeHeader h m@M.Mail{..} =
