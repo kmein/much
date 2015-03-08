@@ -629,6 +629,12 @@ liftE io =
     transformException = ("IO: "++) . show
 
 
+editMailE :: String -> ExceptT String IO String
+editMailE ps =
+    liftE (editMail ps) >>= \case
+        Right r -> return r
+        Left code -> throwE $ "edit mail error: " ++ show code
+
 
 promptE :: String -> ExceptT String IO String
 promptE ps =
@@ -672,55 +678,37 @@ getFileType path =
 
 
 replyToAll :: State -> IO State
-replyToAll q@State{..} = case getMessage (Z.label cursor) of
-    Nothing ->
-        return q { flashMessage = "no message" }
-    Just m -> do
-        let msgId = Notmuch.unMessageID $ Notmuch.messageId m
-        withTempFile' "draft.mail" $ \(path, draftH) -> do
-            (_, _, _, procH) <-
-                withFile "/dev/null" ReadMode $ \nullH ->
-                    createProcess
-                        (proc "notmuch" [ "reply" , msgId ])
-                            { std_in = UseHandle nullH
-                            , std_out = UseHandle draftH
-                            }
-            hClose draftH
-            waitForProcess procH >>= \case
-                ExitFailure code ->
-                    return q { flashMessage =
-                                  Plain $ "notmuch exit code = " ++ show code
-                             }
-                ExitSuccess ->
-                    runEditor' path q >>= \case
-                        ExitFailure code ->
-                            return q { flashMessage = Plain $ "editor exit code = " ++ show code }
-                        ExitSuccess -> do
-                            -- TODO check if path has been written to,
-                            --      else abort
-                            draft <-
-                                M.renderMail' =<<
-                                return . addDateHeader now =<<
-                                return . readMail =<<
-                                T.readFile path
-                            -- TODO use TagOps
-                            Notmuch.notmuchWithInput
-                                [ "insert"
-                                , "--no-hooks"
-                                , "+draft"
-                                -- TODO dont hardcode which tags to delete
-                                , "-inbox"
-                                , "-unread"
-                                ]
-                                draft >>= \case
-                                    (ExitFailure code, _, _) ->
-                                        return q { flashMessage =
-                                            Plain $ "notmuch insert exit code = " ++ show code
-                                        }
-                                    _ ->
-                                        toggleFold q {
-                                            flashMessage = "draft created"
-                                        }
+replyToAll q0 =
+    runExceptT (go q0) >>= \result ->
+        toggleFold q0 { flashMessage = Plain (show result) }
+  where
+    go :: State -> ExceptT String IO String
+    go State{cursor=cursor,now=now} = do
+        msg <- maybe (throwE "not a message") return $
+            getMessage (Z.label cursor)
+
+        let msgId = Notmuch.unMessageID $ Notmuch.messageId msg
+
+        newTags <-
+            lines . LBS8.unpack . fst <$>
+            readNotmuchE ["config", "get", "new.tags"] ""
+
+        let tagOps =
+                map AddTag ["draft"] ++
+                map DelTag (map T.pack newTags)
+
+        readNotmuchE ["reply", msgId] ""
+            >>= return . LBS8.unpack . fst
+
+            -- TODO abort if nothing has been edited
+            >>= editMailE
+
+            >>= return . T.pack
+            >>= return . readMail
+            >>= return . addDateHeader now
+            >>= liftE . M.renderMail'
+            >>= readNotmuchE ("insert" : "--no-hooks" : tagOpsToArgs tagOps)
+            >>  return "draft created"
 
 
 viewSource :: State -> IO State
@@ -890,6 +878,17 @@ removeHeaders :: [CI BS.ByteString] -> M.Mail -> M.Mail
 removeHeaders hs m@M.Mail{..} =
     m { M.mailHeaders = filter (\(k, _) -> CI.mk k `notElem` hs) mailHeaders }
 
+editMail :: String -> IO (Either ExitCode String)
+editMail s =
+    withTempFile' "edit.mail" $ \(path, h_tempFile) -> do
+        hPutStr h_tempFile s
+        hClose h_tempFile
+        editor <- getEnv "EDITOR"
+        runInteractive editor [path] >>= \case
+            ExitSuccess -> Right <$> readFile path
+            code -> return (Left code)
+
+
 prompt :: String -> IO (Either ExitCode String)
 prompt ps =
     withTempFile' "prompt" $ \(path, h_tempFile) -> do
