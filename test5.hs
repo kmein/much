@@ -474,10 +474,6 @@ moveCursorDownToNextUnread =
     moveCursorToUnread findNext botOverrun moveTreeUp
 
 
-setSubForest :: Tree.Forest a -> Tree.Tree a -> Tree.Tree a
-setSubForest sf t = t { Tree.subForest = sf }
-
-
 toggleFold :: State -> IO State
 toggleFold q@State{..} =
     getNewSubForest >>= return . \case
@@ -564,129 +560,6 @@ attachFilesToDraft q0 =
             >>  readNotmuchE ["new", "--no-hooks", "--quiet"] ""
 
             >>  return "files attached"
-
-
-readNotmuchE
-    :: [String]
-    -> LBS8.ByteString
-    -> ExceptT String IO (LBS8.ByteString, LBS8.ByteString)
-readNotmuchE args input = do
-    (exitCode, out, err) <- liftE $ do
-        (Just hin, Just hout, Just herr, ph) <-
-            createProcess (proc "notmuch" args)
-                { std_in = CreatePipe
-                , std_out = CreatePipe
-                , std_err = CreatePipe
-                }
-        LBS8.hPut hin input
-        hClose hin
-
-        out <- LBS8.hGetContents hout
-        err <- LBS8.hGetContents herr
-
-        withForkWait (evaluate $ rnf out) $ \waitOut -> do
-            withForkWait (evaluate $ rnf err) $ \waitErr -> do
-
-              ---- now write any input
-              --unless (null input) $
-              --  ignoreSigPipe $ hPutStr inh input
-              -- hClose performs implicit hFlush, and thus may trigger a SIGPIPE
-              --ignoreSigPipe $ hClose inh
-
-              -- wait on the output
-              waitOut
-              waitErr
-              hClose hout
-              hClose herr
-
-        -- wait on the process
-        exitCode <- waitForProcess ph
-
-        return (exitCode, out, err)
-
-    case exitCode of
-        ExitSuccess -> return (out, err)
-        ExitFailure code ->
-            throwE $ "notmuch " ++ intercalate " " args ++
-                     " exit code: " ++ show code ++ "; stderr:\n" ++
-                     LBS8.unpack err
-
-
-liftE :: IO a -> ExceptT String IO a
-liftE io =
-    lift (try io) >>= either (throwE . transformException) return
-  where
-    transformException :: IOException -> String
-    transformException = ("IO: "++) . show
-
-
-editMailE :: String -> ExceptT String IO String
-editMailE ps =
-    liftE (editMail ps) >>= \case
-        Right r -> return r
-        Left code -> throwE $ "edit mail error: " ++ show code
-
-
-editStringE :: String -> ExceptT String IO String
-editStringE s =
-    liftE (editString s) >>= \case
-        Right r -> return r
-        Left code -> throwE $ "edit string error: " ++ show code
-
-
-editTagsE :: [Tag] -> ExceptT String IO [TagOp]
-editTagsE ps =
-    liftE (editTags ps) >>= \case
-        Right r -> return r
-        Left code -> throwE $ "edit tags error: " ++ show code
-
-
-viewMailE :: String -> ExceptT String IO ()
-viewMailE ps =
-    liftE (viewMail ps) >>= \case
-        Right r -> return r
-        Left code -> throwE $ "view mail error: " ++ show code
-
-
-promptE :: String -> ExceptT String IO String
-promptE ps =
-    liftE (prompt ps) >>= \case
-        Right r -> return r
-        Left code -> throwE $ "prompt error: " ++ show code
-
-
-loadMailE :: Notmuch.MessageID -> ExceptT String IO M.Mail
-loadMailE msgId =
-    liftE (Notmuch.notmuchShowMail $ Notmuch.unMessageID msgId) >>= \case
-        Right m -> return m
-        Left err -> throwE $ "load mail error: " ++ show err
-
-
-attachFilesE :: [FilePath] -> M.Mail -> ExceptT String IO M.Mail
-attachFilesE paths =
-    liftE . attachFiles paths
-
-
-attachFiles :: [FilePath] -> M.Mail -> IO M.Mail
-attachFiles filenames mail0 =
-    foldrM attachFile mail0 filenames
-
-
-attachFile :: FilePath -> M.Mail -> IO M.Mail
-attachFile filePath mail = do
-    fileType <- fromMaybe "application/octet-stream" <$> getFileType filePath
-    M.addAttachment (T.pack fileType) filePath mail
-
-
-getFileType :: FilePath -> IO (Maybe String)
-getFileType path =
-    -- XXX GNU file's exit code is 0 even if path doesn't exist
-    doesFileExist path >>= \case
-        True -> do
-            (_, out, _) <- readProcessWithExitCode "file" ["-Lib", path] ""
-            return $ Just (init out)
-        False ->
-            return Nothing
 
 
 replyToAll :: State -> IO State
@@ -786,6 +659,14 @@ editTagsAtCursor q0 =
         _ <- readNotmuchE ("tag" : tagOpsToArgs tagOps ++ ["--", searchTerm]) ""
 
         return q { cursor = select (==Z.label cursor) (patch tagOps cursor) }
+
+--
+-- utilities
+--
+
+
+setSubForest :: Tree.Forest a -> Tree.Tree a -> Tree.Tree a
+setSubForest sf t = t { Tree.subForest = sf }
 
 
 patchMessage
@@ -839,15 +720,18 @@ addDateHeader t m@M.Mail{..} = do
           ) :
           mailHeaders
       }
-
+
+
 removeHeader :: CI BS.ByteString -> M.Mail -> M.Mail
 removeHeader h m@M.Mail{..} =
     m { M.mailHeaders = filter (\(k, _) -> CI.mk k /= h) mailHeaders }
 
+
 removeHeaders :: [CI BS.ByteString] -> M.Mail -> M.Mail
 removeHeaders hs m@M.Mail{..} =
     m { M.mailHeaders = filter (\(k, _) -> CI.mk k `notElem` hs) mailHeaders }
-
+
+
 editMail :: String -> IO (Either ExitCode String)
 editMail s =
     withTempFile' "edit.mail" $ \(path, h_tempFile) -> do
@@ -915,3 +799,126 @@ runInteractive :: FilePath -> [String] -> IO ExitCode
 runInteractive cmd args = do
     (_, _, _, h_proc) <- createProcess (proc cmd args)
     waitForProcess h_proc
+
+
+liftE :: IO a -> ExceptT String IO a
+liftE io =
+    lift (try io) >>= either (throwE . transformException) return
+  where
+    transformException :: IOException -> String
+    transformException = ("IO: "++) . show
+
+
+editMailE :: String -> ExceptT String IO String
+editMailE ps =
+    liftE (editMail ps) >>= \case
+        Right r -> return r
+        Left code -> throwE $ "edit mail error: " ++ show code
+
+
+editStringE :: String -> ExceptT String IO String
+editStringE s =
+    liftE (editString s) >>= \case
+        Right r -> return r
+        Left code -> throwE $ "edit string error: " ++ show code
+
+
+editTagsE :: [Tag] -> ExceptT String IO [TagOp]
+editTagsE ps =
+    liftE (editTags ps) >>= \case
+        Right r -> return r
+        Left code -> throwE $ "edit tags error: " ++ show code
+
+
+viewMailE :: String -> ExceptT String IO ()
+viewMailE ps =
+    liftE (viewMail ps) >>= \case
+        Right r -> return r
+        Left code -> throwE $ "view mail error: " ++ show code
+
+
+promptE :: String -> ExceptT String IO String
+promptE ps =
+    liftE (prompt ps) >>= \case
+        Right r -> return r
+        Left code -> throwE $ "prompt error: " ++ show code
+
+
+loadMailE :: Notmuch.MessageID -> ExceptT String IO M.Mail
+loadMailE msgId =
+    liftE (Notmuch.notmuchShowMail $ Notmuch.unMessageID msgId) >>= \case
+        Right m -> return m
+        Left err -> throwE $ "load mail error: " ++ show err
+
+
+readNotmuchE
+    :: [String]
+    -> LBS8.ByteString
+    -> ExceptT String IO (LBS8.ByteString, LBS8.ByteString)
+readNotmuchE args input = do
+    (exitCode, out, err) <- liftE $ do
+        (Just hin, Just hout, Just herr, ph) <-
+            createProcess (proc "notmuch" args)
+                { std_in = CreatePipe
+                , std_out = CreatePipe
+                , std_err = CreatePipe
+                }
+        LBS8.hPut hin input
+        hClose hin
+
+        out <- LBS8.hGetContents hout
+        err <- LBS8.hGetContents herr
+
+        withForkWait (evaluate $ rnf out) $ \waitOut -> do
+            withForkWait (evaluate $ rnf err) $ \waitErr -> do
+
+              ---- now write any input
+              --unless (null input) $
+              --  ignoreSigPipe $ hPutStr inh input
+              -- hClose performs implicit hFlush, and thus may trigger a SIGPIPE
+              --ignoreSigPipe $ hClose inh
+
+              -- wait on the output
+              waitOut
+              waitErr
+              hClose hout
+              hClose herr
+
+        -- wait on the process
+        exitCode <- waitForProcess ph
+
+        return (exitCode, out, err)
+
+    case exitCode of
+        ExitSuccess -> return (out, err)
+        ExitFailure code ->
+            throwE $ "notmuch " ++ intercalate " " args ++
+                     " exit code: " ++ show code ++ "; stderr:\n" ++
+                     LBS8.unpack err
+
+
+attachFilesE :: [FilePath] -> M.Mail -> ExceptT String IO M.Mail
+attachFilesE paths =
+    liftE . attachFiles paths
+
+
+attachFiles :: [FilePath] -> M.Mail -> IO M.Mail
+attachFiles filenames mail0 =
+    foldrM attachFile mail0 filenames
+
+
+attachFile :: FilePath -> M.Mail -> IO M.Mail
+attachFile filePath mail = do
+    fileType <- fromMaybe "application/octet-stream" <$> getFileType filePath
+    M.addAttachment (T.pack fileType) filePath mail
+
+
+getFileType :: FilePath -> IO (Maybe String)
+getFileType path =
+    -- XXX GNU file's exit code is 0 even if path doesn't exist
+    doesFileExist path >>= \case
+        True -> do
+            (_, out, _) <- readProcessWithExitCode "file" ["-Lib", path] ""
+            return $ Just (init out)
+        False ->
+            return Nothing
