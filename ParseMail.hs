@@ -34,16 +34,17 @@ readMail =
 
 
 fromMIMEValue :: MIMEValue -> M.Mail
-fromMIMEValue val =
+fromMIMEValue val0 =
     let m = foldr f (M.emptyMail $ M.Address Nothing "anonymous@localhost")
               $ fromMIMEParams
-              $ mime_val_headers val
-    in m { M.mailParts = [[part]] }
+              $ mime_val_headers val0
+    in m { M.mailParts = [part val0] }
   where
 
-    part =
+    part val =
         case mime_val_content val of
             Single content ->
+                (:[]) $
                 M.Part
                     -- TODO actually check if we're utf-8 or ascii(?)
                     { M.partType = "text/plain; charset=utf-8"
@@ -52,7 +53,8 @@ fromMIMEValue val =
                     , M.partHeaders = []
                     , M.partContent = LT.encodeUtf8 $ LT.fromStrict content
                     }
-            _ -> error ("meh: " ++ show val)
+            Multi vals ->
+                concatMap part vals
 
     --f :: H.Header -> M.Mail -> M.Mail
     f (k, v) m = case k of
