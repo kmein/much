@@ -186,7 +186,7 @@ showPairs mtype parts gen =
             ])
         ]
     builder = mconcat
-        [ mconcat $ intersperse (fromByteString "\n")
+        [ mconcat $ intersperse (fromByteString "\r\n")
                   $ map (showBoundPart $ Boundary b) parts
         , showBoundEnd $ Boundary b
         ]
@@ -211,7 +211,7 @@ renderMail g0 (Mail from to cc bcc headers parts) =
         , mconcat $ map showHeader headers
         , showHeader ("MIME-Version", "1.0")
         , mconcat $ map showHeader finalHeaders
-        , fromByteString "\n"
+        , fromByteString "\r\n"
         , finalBuilder
         ]
 
@@ -220,7 +220,7 @@ showHeader (k, v) = mconcat
     [ fromByteString k
     , fromByteString ": "
     , encodeIfNeeded v
-    , fromByteString "\n"
+    , fromByteString "\r\n"
     ]
 
 showAddressHeader :: (S.ByteString, [Address]) -> Builder
@@ -231,7 +231,7 @@ showAddressHeader (k, as) =
     [ fromByteString k
     , fromByteString ": "
     , mconcat (intersperse (fromByteString ", ") . map showAddress $ as)
-    , fromByteString "\n"
+    , fromByteString "\r\n"
     ]
 
 -- |
@@ -249,15 +249,15 @@ showBoundPart :: Boundary -> (Headers, Builder) -> Builder
 showBoundPart (Boundary b) (headers, content) = mconcat
     [ fromByteString "--"
     , fromText b
-    , fromByteString "\n"
+    , fromByteString "\r\n"
     , mconcat $ map showHeader headers
-    , fromByteString "\n"
+    , fromByteString "\r\n"
     , content
     ]
 
 showBoundEnd :: Boundary -> Builder
 showBoundEnd (Boundary b) = mconcat
-    [ fromByteString "\n--"
+    [ fromByteString "\r\n--"
     , fromText b
     , fromByteString "--"
     ]
