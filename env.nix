@@ -26,9 +26,9 @@ let
       hsemail
       linebreak
       mbox
-      mime-mail # because modified showAddress
       multipart
       process
+      random
       rosezipper
       safe
       split
@@ -40,7 +40,6 @@ let
   hsPkgs = pkgs.haskellngPackages.override {
     overrides = self: super: with self; {
       email-header = callPackage ./nix/email-header.nix {};
-      mime-mail = callPackage ./nix/mime-mail.nix {};
     };
   };
 
