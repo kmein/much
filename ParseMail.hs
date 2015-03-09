@@ -5,6 +5,7 @@ module ParseMail (readMail) where
 
 import qualified Data.Attoparsec.ByteString.Char8 as A8
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text as T
@@ -15,6 +16,7 @@ import qualified Network.Email.Header.Parser as P
 import qualified Network.Email.Header.Types as H
 import qualified Network.Mail.Mime as M
 import Codec.MIME.Parse
+import qualified Codec.MIME.QuotedPrintable as QP
 import Codec.MIME.Type
 import Control.Applicative
 import Data.Monoid
@@ -273,11 +275,29 @@ quotedString =
     T.pack <$> (A8.char '"' *> A8.many' (qtext <|> quotedPair) <* A8.char '"')
 
 
--- word        =  atom / quoted-string
+encodedWord :: A8.Parser T.Text
+encodedWord =
+    (A8.<?> "encodedWord") $ do
+        _ <- A8.string "=?"
+        _ <- A8.string "utf-8" -- TODO 1. CI, 2. other encodings
+        _ <- A8.string "?Q?"
+        w <- A8.manyTill A8.anyChar (A8.string "?=") -- TODO all of them
+        return
+            $ T.decodeUtf8
+            $ BS8.pack
+            $ QP.decode
+                -- ^ TODO this current doesn't decode
+                -- underscore to space
+            $ map (\c -> if c == '_' then ' ' else c)
+            $ w
+
+
+-- word        =  encoded-word / atom / quoted-string
+--                ^ TODO what's the correct term for that?
 word :: A8.Parser T.Text
 word =
     (A8.<?> "word") $
-    atom <|> quotedString
+    encodedWord <|> atom <|> quotedString
 
 
 atomClass :: [Char]
