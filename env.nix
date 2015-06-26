@@ -38,9 +38,7 @@ let
   );
 
   hsPkgs = pkgs.haskellngPackages.override {
-    overrides = self: super: with self; {
-      email-header = callPackage ./nix/email-header.nix {};
-    };
+    overrides = (import ./common.nix).haskell-overrides;
   };
 
   pkgs = nixpkgs // staticPkgs;

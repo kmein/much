@@ -25,20 +25,22 @@ import TreeView
 humanTimeLocale :: HumanTimeLocale
 humanTimeLocale = defaultHumanTimeLocale
     { justNow       = "now"
-    , secondsAgo    = (++ "s ago")
-    , oneMinuteAgo  = "1m ago"
-    , minutesAgo    = (++ "m ago")
-    , oneHourAgo    = "1h ago"
-    , aboutHoursAgo = (++ "h ago")
+    , secondsAgo    = \f -> (++ "s" ++ dir f)
+    , oneMinuteAgo  = \f -> "1m" ++ dir f
+    , minutesAgo    = \f -> (++ "m" ++ dir f)
+    , oneHourAgo    = \f -> "1h" ++ dir f
+    , aboutHoursAgo = \f -> (++ "h" ++ dir f)
     , at            = \_ -> ("" ++)
-    , daysAgo       = (++ "d ago")
-    , weekAgo       = (++ "w ago")
-    , weeksAgo      = (++ "w ago")
+    , daysAgo       = \f -> (++ "d" ++ dir f)
+    , weekAgo       = \f -> (++ "w" ++ dir f)
+    , weeksAgo      = \f -> (++ "w" ++ dir f)
     , onYear        = ("" ++)
     , dayOfWeekFmt  = "%a %H:%M"
     , thisYearFmt   = "%b %e"
     , prevYearFmt   = "%b %e, %Y"
     }
+  where dir True  = " from now"
+        dir False = " ago"
 
 
 renderTreeView

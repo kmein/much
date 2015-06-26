@@ -97,7 +97,7 @@ instance IsPm Bold where
     toPm NoBold = [22]
     fromPm = rec . filterPm sgrColor
       where
-        rec xs = case filter (`elem`[1,22]) xs of
+        rec xs = case filter (`elem` ([1,22] :: [Int])) xs of
             [] -> Nothing
             xs' -> case last xs' of
                 1 -> Just Bold
@@ -113,7 +113,7 @@ instance IsPm Underline where
     toPm NoUnderline = [24]
     fromPm = rec . filterPm sgrColor
       where
-        rec xs = case filter (`elem`[4,24]) xs of
+        rec xs = case filter (`elem` ([4,24] :: [Int])) xs of
             [] -> Nothing
             xs' -> case last xs' of
                 1 -> Just Underline

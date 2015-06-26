@@ -35,11 +35,10 @@ import RenderTreeView (renderTreeView)
 import Scanner (scan)
 import Safe
 import System.Directory
-import System.Console.Docopt (getArgWithDefault, optionsWithUsage, shortOption)
+import System.Console.Docopt.NoTH (getArgWithDefault, parseArgsOrExit, parseUsageOrExit, shortOption)
 import System.Environment
 import System.Exit
 import System.IO
-import System.Locale (defaultTimeLocale, rfc822DateFormat)
 import System.Posix.Signals
 import System.Process
 import TagUtils
@@ -115,7 +114,8 @@ main =
 
 mainWithArgs :: [String] -> IO ()
 mainWithArgs args = do
-    args' <- optionsWithUsage usage args
+    usage' <- parseUsageOrExit usage
+    args' <- parseArgsOrExit usage' args
     let query = getArgWithDefault args' defaultSearch (shortOption 'q')
     bracket (initState query) cleanup startup
   where
