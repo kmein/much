@@ -1,23 +1,11 @@
 module Event where
 
-import Trammel
-
+import Blessings
+import Scanner
 
 data Event =
-    EFlash (Trammel String) |
-    EKey String |
-    EMouse MouseInfo |
+    EFlash (Blessings String) |
+    EScan Scan |
     EReload |
     EResize Int Int
-  deriving Show
-
-
-data MouseInfo = MouseInfo
-    { mouseButton :: Int -- 0 = release
-    , mouseShift :: Bool
-    , mouseMeta :: Bool
-    , mouseControl :: Bool
-    , mouseX :: Int
-    , mouseY :: Int
-    }
   deriving Show

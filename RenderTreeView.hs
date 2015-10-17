@@ -11,13 +11,13 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Tree.Zipper as Z
 import qualified TreeZipperUtils as Z
+import Blessings
 import Data.Char
 import Data.Monoid
 import Data.Time
 import Data.Time.Format.Human
 import Data.Tree
 import TagUtils (Tag)
-import Trammel
 import TreeView
 
 
@@ -47,7 +47,7 @@ renderTreeView
     :: UTCTime
     -> Z.TreePos Z.Full TreeView
     -> Z.TreePos Z.Full TreeView
-    -> [Trammel String]
+    -> [Blessings String]
 renderTreeView now cur =
     renderNode
   where
@@ -69,7 +69,7 @@ renderTreeView now cur =
         maybe mempty renderSubForest
 
 
-renderPrefix :: Z.TreePos Z.Full TreeView -> Trammel String
+renderPrefix :: Z.TreePos Z.Full TreeView -> Blessings String
 renderPrefix =
     mconcat . reverse . map prefix . zip [(1 :: Int)..] . Z.path
   where
@@ -96,7 +96,7 @@ spacePrefix
     , teePrefix
     , pipePrefix
     , endPrefix
-    :: Trammel String
+    :: Blessings String
 spacePrefix = prefixSGR "  "
 teePrefix   = prefixSGR "├╴"
 pipePrefix  = prefixSGR "│ "
@@ -116,7 +116,7 @@ searchSGR
     , unreadSearchSGR
     , killedTagSGR
     , starTagSGR
-    :: Trammel String -> Trammel String
+    :: Blessings String -> Blessings String
 searchSGR = SGR [38,5,162]
 focusSGR = SGR [38,5,160]
 quoteSGR = SGR [38,5,242]
@@ -133,7 +133,7 @@ unreadMessageSGR = SGR [38,5,117]
 unreadSearchSGR = SGR [38,5,250]
 
 
-renderTreeView1 :: UTCTime -> Bool -> TreeView -> Trammel String
+renderTreeView1 :: UTCTime -> Bool -> TreeView -> Blessings String
 renderTreeView1 now hasFocus x = case x of
 
     TVSearch s ->
@@ -190,7 +190,7 @@ renderTreeView1 now hasFocus x = case x of
 
 
 
-renderDate :: UTCTime -> TreeView -> Trammel String
+renderDate :: UTCTime -> TreeView -> Blessings String
 renderDate now = \case
     TVSearchResult sr -> f humanTimeLocale (Notmuch.searchTime sr)
     TVMessage m -> f humanTimeLocale (Notmuch.messageTime m)
@@ -200,19 +200,19 @@ renderDate now = \case
         Plain $ humanReadableTimeI18N' timeLocale now time
 
 
-renderFrom :: Maybe T.Text -> Trammel String
+renderFrom :: Maybe T.Text -> Blessings String
 renderFrom = \case
     Just fromLine -> Plain $ dropAddress $ T.unpack fromLine
     Nothing -> SGR [35,1] "Anonymous"
 
 
-renderTags :: [Tag] -> Trammel String
+renderTags :: [Tag] -> Blessings String
 renderTags =
     -- TODO sort somewhere else
     mconcat . L.intersperse " " . map renderTag . L.sort
 
 
-renderTag :: Tag -> Trammel String
+renderTag :: Tag -> Blessings String
 renderTag tag = case tag of
     "draft" -> draftTagSGR plain
     "killed" -> killedTagSGR plain

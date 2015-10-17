@@ -18,6 +18,8 @@ let
   hsEnv = hsPkgs.ghcWithPackages (self: with self;
     [
       aeson
+      blaze-builder
+      blessings
       cabal-install
       case-insensitive
       docopt
@@ -31,6 +33,7 @@ let
       random
       rosezipper
       safe
+      scanner
       split
       temporary
       terminal-size

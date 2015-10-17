@@ -1,5 +1,5 @@
 name:           much
-version:        0.0.0.0
+version:        1.0.0
 license:        MIT
 author:         tv <tv@shackspace.de>
 maintainer:     tv@shackspace.de
@@ -13,6 +13,7 @@ executable much
                 , attoparsec
                 , base64-bytestring
                 , blaze-builder
+                , blessings
                 , bytestring
                 , case-insensitive
                 , containers
@@ -29,6 +30,7 @@ executable much
                 , random
                 , rosezipper
                 , safe
+                , scanner
                 , split
                 , terminal-size
                 , text

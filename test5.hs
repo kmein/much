@@ -17,6 +17,7 @@ import qualified Notmuch
 import qualified Notmuch.Message as Notmuch
 import qualified Notmuch.SearchResult as Notmuch
 import qualified System.Console.Terminal.Size as Term
+import Blessings
 import Control.Applicative
 import Control.Concurrent
 import Control.Exception
@@ -32,7 +33,7 @@ import Data.Time
 import Event
 import ParseMail (readMail)
 import RenderTreeView (renderTreeView)
-import Scanner (scan)
+import Scanner (scan,Scan(..))
 import Safe
 import System.Directory
 import System.Console.Docopt.NoTH (getArgWithDefault, parseArgsOrExit, parseUsageOrExit, shortOption)
@@ -44,7 +45,6 @@ import System.Process
 import TagUtils
 import Text.Hyphenation
 import Text.LineBreak
-import Trammel
 import TreeSearch
 import TreeView
 import TreeZipperUtils (modifyFirstParentLabelWhere)
@@ -72,11 +72,11 @@ data State = State
     { cursor :: Z.TreePos Z.Full TreeView
     , xoffset :: Int
     , yoffset :: Int
-    , flashMessage :: Trammel String
+    , flashMessage :: Blessings String
     , screenWidth :: Int
     , screenHeight :: Int
-    , headBuffer :: [Trammel String]
-    , treeBuffer :: [Trammel String]
+    , headBuffer :: [Blessings String]
+    , treeBuffer :: [Blessings String]
     , now :: UTCTime
     , decset :: [Int]
     , decrst :: [Int]
@@ -165,7 +165,7 @@ startup q0 = do
         ]
 
     threadIds <- mapM forkIO
-        [ forever $ scan stdin >>= putEvent
+        [ forever $ scan stdin >>= putEvent . EScan
         , run getEvent q0
         ]
 
@@ -199,14 +199,13 @@ run getEvent = rec where
         redraw q' >> getEvent >>= processEvent q'
 
 
--- TODO merge EKey and EMouse?
 processEvent :: State -> Event -> IO State
 processEvent q = \case
     EFlash t ->
         return q { flashMessage = t }
-    EKey s ->
+    EScan (ScanKey s) ->
         keymap s q
-    EMouse info ->
+    EScan info@ScanMouse{..} ->
         mousemap info q
     EResize w h ->
         return q
@@ -235,10 +234,10 @@ render q@State{..} =
           <> " " <> Plain (show (xoffset, yoffset))
         ]
 
-render0 :: State -> [Trammel String]
+render0 :: State -> [Blessings String]
 render0 _q@State{..} = do
     let buffer =
-            map (trammelTake screenWidth . trammelDrop xoffset) $
+            map (blessingsTake screenWidth . blessingsDrop xoffset) $
             take screenHeight $
             headBuffer ++ drop yoffset treeBuffer
     buffer ++ take (screenHeight - length buffer) (repeat "~")
@@ -341,13 +340,13 @@ keymap s = \q ->
     return q { flashMessage = Plain $ show s }
 
 
-mousemap :: MouseInfo -> State -> IO State
+mousemap :: Scan -> State -> IO State
 
-mousemap MouseInfo{mouseButton=1,mouseY=y} = defaultMouse1Click y
-mousemap MouseInfo{mouseButton=3,mouseY=y} = \q -> defaultMouse1Click y q >>= toggleFold
-mousemap MouseInfo{mouseButton=4} = moveTreeDown 3
-mousemap MouseInfo{mouseButton=5} = moveTreeUp 3
-mousemap MouseInfo{mouseButton=0} = return
+mousemap ScanMouse{mouseButton=1,mouseY=y} = defaultMouse1Click y
+mousemap ScanMouse{mouseButton=3,mouseY=y} = \q -> defaultMouse1Click y q >>= toggleFold
+mousemap ScanMouse{mouseButton=4} = moveTreeDown 3
+mousemap ScanMouse{mouseButton=5} = moveTreeUp 3
+mousemap ScanMouse{mouseButton=0} = return
 mousemap info = \q ->
     return q { flashMessage = SGR [38,5,202] $ Plain $ show info }
 
