@@ -34,6 +34,7 @@ import Event
 import ParseMail (readMail)
 import RenderTreeView (renderTreeView)
 import Scanner (scan,Scan(..))
+import Screen
 import Safe
 import System.Directory
 import System.Console.Docopt.NoTH (getArgWithDefault, parseArgsOrExit, parseUsageOrExit, shortOption)
@@ -78,8 +79,6 @@ data State = State
     , headBuffer :: [Blessings String]
     , treeBuffer :: [Blessings String]
     , now :: UTCTime
-    , decset :: [Int]
-    , decrst :: [Int]
     }
 
 initState :: String -> IO State
@@ -96,14 +95,6 @@ initState query = do
         , headBuffer = []
         , treeBuffer = []
         , now = UTCTime (fromGregorian 1984 5 23) 49062
-        , decset =
-            1000 : -- X & Y on button press and release
-            1005 : -- UTF-8 mouse mode
-            1049 : -- use cleared alternate screen buffer
-            []
-        , decrst =
-            25 : -- hide cursor
-            []
         }
 
 
@@ -117,7 +108,7 @@ mainWithArgs args = do
     usage' <- parseUsageOrExit usage
     args' <- parseArgsOrExit usage' args
     let query = getArgWithDefault args' defaultSearch (shortOption 'q')
-    bracket (initState query) cleanup startup
+    withScreen s0 (\_-> initState query >>= runState)
   where
     usage = unlines
       [ "Command-line MUA using notmuch."
@@ -131,24 +122,19 @@ mainWithArgs args = do
       ]
     defaultSearch = "tag:inbox AND NOT tag:killed"
 
+    s0 = Screen False NoBuffering (BlockBuffering $ Just 4096)
+            [ 1000 -- X & Y on button press and release
+            , 1005 -- UTF-8 mouse mode
+            , 1047 -- use alternate screen buffer
+            ]
+            [   25 -- hide cursor
+            ]
 
-cleanup :: State -> IO ()
-cleanup q@State{..} = do
-    hSetEcho stdin True
-    resetTerm q { decset = decrst, decrst = decset }
-
-
-startup :: State -> IO ()
-startup q0 = do
+runState :: State -> IO ()
+runState q0 = do
 
     -- load-env hack
     maybe (return ()) (setEnv "HOME") =<< lookupEnv "OLDHOME"
-
-    -- TODO move this to resetTerm?
-    hSetBuffering stdin NoBuffering
-    hSetBuffering stdout (BlockBuffering $ Just 4096)
-
-    resetTerm q0
 
     (putEvent, getEvent) <- do
         v <- newEmptyMVar
@@ -173,13 +159,6 @@ startup q0 = do
 
     waitForShutdown
     mapM_ killThread threadIds
-
-
-resetTerm :: State -> IO ()
-resetTerm State{..} = do
-    hSetEcho stdin False
-    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decset) ++ "h"
-    hPutStr stdout $ "\ESC[?" ++ intercalate ";" (map show decrst) ++ "l"
 
 
 winchHandler :: (Event -> IO ()) -> IO ()
