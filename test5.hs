@@ -140,24 +140,18 @@ runState q0 = do
         v <- newEmptyMVar
         return (putMVar v, takeMVar v)
 
-    (shutdown, waitForShutdown) <- do
-        v <- newEmptyMVar
-        return (putMVar v (), takeMVar v)
-
-
     mapM_ (\(s, f) -> installHandler s (Catch f) Nothing)
-        [ (sigINT, shutdown)
+        [ (sigINT, putEvent EShutdown)
         , (28, winchHandler putEvent)
         ]
 
     threadIds <- mapM forkIO
         [ forever $ scan stdin >>= putEvent . EScan
-        , run getEvent q0
         ]
 
     winchHandler putEvent
 
-    waitForShutdown
+    run getEvent q1
     mapM_ killThread threadIds
 
 
@@ -171,28 +165,32 @@ winchHandler putEvent =
 
 
 run :: IO Event -> State -> IO ()
-run getEvent = rec where
-    rec q = rec =<< do
-        t <- getCurrentTime
-        let q' = render q { now = t }
-        redraw q' >> getEvent >>= processEvent q'
+run getEvent = rec . Right where
+    rec = \case
+        Right q -> rec =<< do
+            t <- getCurrentTime
+            let q' = render q { now = t }
+            redraw q' >> getEvent >>= processEvent q'
+        Left _q -> return ()
 
 
-processEvent :: State -> Event -> IO State
+processEvent :: State -> Event -> IO (Either State State)
 processEvent q = \case
     EFlash t ->
-        return q { flashMessage = t }
+        return $ Right q { flashMessage = t }
     EScan (ScanKey s) ->
-        keymap s q
+        Right <$> keymap s q
     EScan info@ScanMouse{..} ->
-        mousemap info q
+        Right <$> mousemap info q
+    EShutdown ->
+        return $ Left q
     EResize w h ->
-        return q
+        return $ Right q
             { screenWidth = w, screenHeight = h
             , flashMessage = Plain $ "resize " <> show (w,h)
             }
     ev ->
-        return q
+        return $ Right q
             { flashMessage = SGR [31,1] $ Plain $ "unhandled event: " <> show ev
             }
 
