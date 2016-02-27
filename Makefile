@@ -1,6 +1,9 @@
+.PHONY: ghci
+ghci: shell.nix
+	nix-shell --arg nixpkgs 'import <stockholm>' --command 'exec ghci -Wall'
 
-.PHONY: all
-all:
+shell.nix: $(wildcard *.cabal)
+	cabal2nix --shell . > $@
 
 .PHONY: clean
 clean:
