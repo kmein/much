@@ -61,15 +61,12 @@ fromMIMEValue val0 =
     --f :: H.Header -> M.Mail -> M.Mail
     f (k, v) m = case k of
         "from" ->
-            m { M.mailFrom =
-                    (\case
-                        Mailbox a -> a
-                        Group _ _ ->
-                            error "cannot use group in from header"
-                    ) $
-                    either error id $
-                    parseAddress $
-                    LBS.toStrict v
+            m { M.mailFrom = case parseAddress (LBS.toStrict v) of
+                  Left msg -> error msg
+                  Right Nothing -> M.mailFrom m
+                  Right (Just (Mailbox a)) -> a
+                  Right (Just (Group _ _)) ->
+                      error "cannot use group in from header"
                 }
         "to" ->
             m { M.mailTo =
@@ -116,9 +113,9 @@ fromMIMEValue val0 =
               }
 
 
-parseAddress :: BS.ByteString -> Either String Address
+parseAddress :: BS.ByteString -> Either String (Maybe Address)
 parseAddress =
-    A8.parseOnly (P.cfws *> address <* A8.endOfInput)
+    A8.parseOnly (P.cfws *> (Just <$> address <|> return Nothing) <* A8.endOfInput)
 
 
 parseAddresses :: BS.ByteString -> Either String [Address]
