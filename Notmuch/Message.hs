@@ -3,7 +3,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Notmuch.Message where
 
-import Control.Applicative
 import Data.Aeson
 import Data.Aeson.Types (Parser)
 import Data.Time.Calendar

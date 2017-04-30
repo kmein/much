@@ -19,7 +19,6 @@ module TreeView
 
 
 import qualified Data.Text as T
-import Control.Applicative
 import Data.Monoid
 import Data.Tree
 import Notmuch

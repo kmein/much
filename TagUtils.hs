@@ -8,7 +8,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Char
 import Data.List.Split (wordsBy)
-import Data.Monoid
 import Data.Tree
 import Notmuch.Message
 import Notmuch.SearchResult

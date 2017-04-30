@@ -36,7 +36,6 @@ module Network.Mail.Mime
 import qualified Data.ByteString.Lazy as L
 import Blaze.ByteString.Builder.Char.Utf8
 import Blaze.ByteString.Builder
-import Data.Monoid
 import System.Random
 import Control.Arrow
 import System.Process

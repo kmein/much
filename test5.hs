@@ -18,7 +18,6 @@ import qualified Notmuch.Message as Notmuch
 import qualified Notmuch.SearchResult as Notmuch
 import qualified System.Console.Terminal.Size as Term
 import Blessings
-import Control.Applicative
 import Control.Concurrent
 import Control.Exception
 import Control.Monad

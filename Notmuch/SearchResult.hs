@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Notmuch.SearchResult where
 
-import Control.Applicative
 import Data.Aeson
 import Data.Text
 import Data.Time.Clock
