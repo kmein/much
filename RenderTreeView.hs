@@ -106,6 +106,7 @@ endPrefix   = prefixSGR "└╴"
 -- TODO locale-style: headerKey = \s -> SGR [..] (s <> ": ")
 
 searchSGR
+    , altSGR
     , focusSGR
     , quoteSGR
     , boringSGR
@@ -117,6 +118,8 @@ searchSGR
     , killedTagSGR
     , starTagSGR
     :: Blessings String -> Blessings String
+
+altSGR = SGR [38,5,182]
 searchSGR = SGR [38,5,162]
 focusSGR = SGR [38,5,160]
 quoteSGR = SGR [38,5,242]
@@ -142,13 +145,24 @@ renderTreeView1 now hasFocus x = case x of
 
     TVSearchResult sr ->
         let c = if hasFocus then focusSGR else
-                    if "unread" `elem` Notmuch.searchTags sr
+                    if isUnread
                         then unreadSearchSGR
                         else boringSGR
+            c_authors =
+                if hasFocus then focusSGR else
+                    if isUnread
+                        then altSGR
+                        else boringSGR
+
+            isUnread = "unread" `elem` Notmuch.searchTags sr
+
+            authors = Plain $ T.unpack $ Notmuch.searchAuthors sr
             date = dateSGR $ renderDate now x
+            subject = Plain $ T.unpack $ Notmuch.searchSubject sr
             tags = tagsSGR $ renderTags (Notmuch.searchTags sr)
-            subj = Plain $ T.unpack $ Notmuch.searchSubject sr
-        in c $ subj <> " " <> date <> " " <> tags
+            title = if subject /= "" then subject else c_authors authors
+        in
+          c $ title <> " " <> date <> " " <> tags
 
     TVMessage m ->
         let fromSGR =
