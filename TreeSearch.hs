@@ -80,10 +80,10 @@ skipSame
       (TreePos Full a -> Maybe (TreePos Full a)) ->
       TreePos Full a ->
       Maybe (TreePos Full a)
-skipSame next loc =
-    case next loc of
+skipSame next' loc =
+    case next' loc of
         Nothing -> Nothing
         Just loc' ->
             if label loc' == label loc
-                then skipSame next loc'
+                then skipSame next' loc'
                 else Just loc'
