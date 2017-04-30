@@ -206,7 +206,7 @@ unloadReadSubForests t = case rootLabel t of
 
 unloadPartsWithFilename :: Forest TreeView -> Forest TreeView
 unloadPartsWithFilename =
-    map (rewriteTree f)
+    map rewriteTree
   where
     f x@Node{..} = case rootLabel of
       TVMessagePart _ mp ->
@@ -216,10 +216,9 @@ unloadPartsWithFilename =
                   x { subForest = [] }
       _ -> x
 
-    rewriteTree :: (Tree a -> Tree a) -> Tree a -> Tree a
-    rewriteTree f x =
+    rewriteTree x =
         let x' = f x
-        in x' { subForest = map (rewriteTree f) $ subForest x' }
+        in x' { subForest = map rewriteTree $ subForest x' }
 
 
 findFirsts :: (a -> Bool) -> Forest a -> Forest a
