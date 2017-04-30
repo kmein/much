@@ -140,9 +140,9 @@ notmuchWithInput args input = do
     return (exitCode, out, err)
 
 
-search :: String -> IO (Either String [SearchResult])
-search term =
-    notmuch [ "search", "--format=json", "--format-version=2", term ]
+search :: [String] -> IO (Either String [SearchResult])
+search args =
+    notmuch ("search" : "--format=json" : "--format-version=2" : args)
         >>= return . eitherDecode'
 
 

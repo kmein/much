@@ -83,7 +83,7 @@ data State = State
 
 initState :: String -> IO State
 initState query = do
-    r_ <- either error id <$> Notmuch.search query
+    r_ <- either error id <$> Notmuch.search [query]
 
     return State
         { cursor = Z.fromTree $ fromSearchResults query r_

@@ -158,7 +158,7 @@ loadSubForest = \case
             . subForest
             . fromSearchResults s
             . either error id
-            <$> Notmuch.search s
+            <$> Notmuch.search [s]
 
     _ ->
         return $ Right []
