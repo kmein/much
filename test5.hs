@@ -79,6 +79,7 @@ data State = State
     , headBuffer :: [Blessings String]
     , treeBuffer :: [Blessings String]
     , now :: UTCTime
+    , signalHandlers :: [(Signal, IO ())]
     }
 
 initState :: String -> IO State
@@ -95,6 +96,7 @@ initState query = do
         , headBuffer = []
         , treeBuffer = []
         , now = UTCTime (fromGregorian 1984 5 23) 49062
+        , signalHandlers = []
         }
 
 
@@ -140,10 +142,12 @@ runState q0 = do
         v <- newEmptyMVar
         return (putMVar v, takeMVar v)
 
-    mapM_ (\(s, f) -> installHandler s (Catch f) Nothing)
-        [ (sigINT, putEvent EShutdown)
-        , (28, winchHandler putEvent)
-        ]
+    let q1 = q0 { signalHandlers =
+                    [ (sigINT, putEvent EShutdown)
+                    , (28, winchHandler putEvent)
+                    ] }
+
+    installHandlers (signalHandlers q1)
 
     threadIds <- mapM forkIO
         [ forever $ scan stdin >>= putEvent . EScan
@@ -153,6 +157,21 @@ runState q0 = do
 
     run getEvent q1
     mapM_ killThread threadIds
+
+
+installHandlers :: [(Signal, IO ())] -> IO ()
+installHandlers =
+    mapM_ (\(s, h) -> installHandler s (Catch h) Nothing)
+
+uninstallHandlers :: [(Signal, IO ())] -> IO ()
+uninstallHandlers =
+    mapM_ (\(s, _) -> installHandler s Ignore Nothing)
+
+withoutHandlers :: (State -> IO State) -> State -> IO State
+withoutHandlers f q@State{..} =
+    bracket_ (uninstallHandlers signalHandlers)
+             (installHandlers signalHandlers)
+             (f q)
 
 
 winchHandler :: (Event -> IO ()) -> IO ()
@@ -242,8 +261,8 @@ keymap "s" = toggleTagAtCursor "unread"
 keymap "&" = toggleTagAtCursor "killed"
 keymap "*" = toggleTagAtCursor "star"
 keymap "r" = replyToAll
-keymap "e" = viewSource
-keymap "t" = editTagsAtCursor
+keymap "e" = withoutHandlers viewSource
+keymap "t" = withoutHandlers editTagsAtCursor
 keymap "k" = moveCursorUp 1
 keymap "j" = moveCursorDown 1
 keymap "K" = moveTreeDown 1
