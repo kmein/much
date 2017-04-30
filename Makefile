@@ -13,10 +13,6 @@ ghci: shell.nix
 install:
 	$(error to install run "make result && nix-env -i ./result")
 
-.PHONY: install-env
-install-env:
-	nix-env -f env.nix -i
-
 .PHONY: result
 result: shell.nix
 	nix-build --arg nixpkgs 'import <stockholm>' ./shell.nix
