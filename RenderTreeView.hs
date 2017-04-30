@@ -113,10 +113,12 @@ searchSGR
     , prefixSGR
     , dateSGR
     , tagsSGR
+    , boringMessageSGR
     , unreadMessageSGR
     , unreadSearchSGR
     , killedTagSGR
     , starTagSGR
+    , draftTagSGR
     :: Blessings String -> Blessings String
 
 altSGR = SGR [38,5,182]
