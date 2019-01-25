@@ -13,7 +13,6 @@ import qualified Data.Tree.Zipper as Z
 import qualified TreeZipperUtils as Z
 import Blessings
 import Data.Char
-import Data.Monoid
 import Data.Time
 import Data.Time.Format.Human
 import Data.Tree

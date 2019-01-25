@@ -27,7 +27,6 @@ import Data.Aeson (eitherDecode')
 import Data.Foldable (foldrM)
 import Data.List (intercalate)
 import Data.Maybe
-import Data.Monoid
 import Data.Time
 import Event
 import ParseMail (readMail)

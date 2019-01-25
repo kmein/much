@@ -8,7 +8,6 @@ import Data.Aeson.Types (Parser)
 import Data.Time.Calendar
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
-import Data.Monoid
 import Notmuch.Class
 import qualified Data.Text as T
 import qualified Data.Map as M

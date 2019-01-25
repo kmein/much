@@ -19,7 +19,6 @@ import Codec.MIME.Parse
 import qualified Codec.MIME.QuotedPrintable as QP
 import Codec.MIME.Type
 import Control.Applicative
-import Data.Monoid
 import Data.Char
 
 

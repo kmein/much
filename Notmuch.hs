@@ -11,7 +11,6 @@ import Control.Concurrent
 import Control.DeepSeq (rnf)
 import Control.Exception
 import Data.Aeson
-import Data.Monoid
 import Data.Tree
 import Notmuch.Class
 import Notmuch.Message

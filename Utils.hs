@@ -1,7 +1,6 @@
 module Utils where
 
 import Control.Exception
-import Data.Monoid
 import System.Directory
 import System.IO
 
