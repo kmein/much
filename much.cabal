@@ -1,8 +1,8 @@
 name:           much
-version:        1.1.0
+version:        1.2.0
 license:        MIT
-author:         tv <tv@shackspace.de>
-maintainer:     tv@shackspace.de
+author:         tv <tv@krebsco.de>
+maintainer:     tv@krebsco.de
 build-type:     Simple
 cabal-version:  >=1.10
 

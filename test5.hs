@@ -17,7 +17,8 @@ import qualified Notmuch
 import qualified Notmuch.Message as Notmuch
 import qualified Notmuch.SearchResult as Notmuch
 import qualified System.Console.Terminal.Size as Term
-import Blessings
+import Blessings.String (Blessings(Plain,SGR),pp)
+import qualified Blessings.Internal as Blessings
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
@@ -235,7 +236,7 @@ render q@State{..} =
 render0 :: State -> [Blessings String]
 render0 _q@State{..} = do
     let buffer =
-            map (blessingsTake screenWidth . blessingsDrop xoffset) $
+            map (Blessings.take screenWidth . Blessings.drop xoffset) $
             take screenHeight $
             headBuffer ++ drop yoffset treeBuffer
     buffer ++ take (screenHeight - length buffer) (repeat "~")
@@ -248,7 +249,7 @@ redraw q@State{..} = do
   where
     sub x x' c = if c == x then x' else c
     eraseRight s =
-        if len s < screenWidth
+        if Blessings.length s < screenWidth
             then s <> "\ESC[K"
             else s
 
