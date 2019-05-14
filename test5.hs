@@ -35,6 +35,7 @@ import RenderTreeView (renderTreeView)
 import Scanner (scan,Scan(..))
 import Screen
 import Safe
+import State
 import System.Directory
 import System.Console.Docopt.NoTH (getArgWithDefault, parseArgsOrExit, parseUsageOrExit, shortOption)
 import System.Environment
@@ -67,19 +68,6 @@ withForkWait async body = do
     let wait = takeMVar waitVar >>= either throwIO return
     restore (body wait) `onException` killThread tid
 
-
-data State = State
-    { cursor :: Z.TreePos Z.Full TreeView
-    , xoffset :: Int
-    , yoffset :: Int
-    , flashMessage :: Blessings String
-    , screenWidth :: Int
-    , screenHeight :: Int
-    , headBuffer :: [Blessings String]
-    , treeBuffer :: [Blessings String]
-    , now :: UTCTime
-    , signalHandlers :: [(Signal, IO ())]
-    }
 
 initState :: String -> IO State
 initState query = do
