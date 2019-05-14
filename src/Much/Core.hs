@@ -5,9 +5,11 @@
 module Much.Core where
 
 import Much.Action
+import Much.API
 import Blessings.String (Blessings(Plain,SGR),pp)
 import Control.Concurrent
 import Control.Monad
+import Data.Functor
 import Data.Time
 import Much.Event
 import Much.RenderTreeView (renderTreeView)
@@ -123,6 +125,7 @@ runState q0 = do
 
     threadIds <- mapM forkIO
         [ forever $ scan stdin >>= putEvent . EScan
+        , Much.API.main putEvent
         ]
 
     winchHandler putEvent
@@ -173,6 +176,8 @@ processEvent q = \case
             { screenWidth = w, screenHeight = h
             , flashMessage = Plain $ "resize " <> show (w,h)
             }
+    EStateGet f ->
+        forkIO (f q) $> Right q
     ev ->
         return $ Right q
             { flashMessage = SGR [31,1] $ Plain $ "unhandled event: " <> show ev

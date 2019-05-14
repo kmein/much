@@ -1,6 +1,7 @@
 module Much.Event where
 
 import Blessings
+import Much.State
 import Scanner
 
 data Event =
@@ -8,5 +9,6 @@ data Event =
     EScan Scan |
     EShutdown |
     EReload |
-    EResize Int Int
+    EResize Int Int |
+    EStateGet (State -> IO ())
   deriving Show

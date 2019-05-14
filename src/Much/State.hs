@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Much.State where
 
 import Blessings.String (Blessings)
@@ -40,3 +41,6 @@ data ColorConfig = ColorConfig
     , boringMessage :: Blessings String -> Blessings String
     , tagMap :: [(T.Text, Blessings String -> Blessings String)]
     }
+
+instance Show (State -> IO ()) where
+    show = const "λ"
