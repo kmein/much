@@ -10,7 +10,7 @@ import qualified Network.Mail.Mime as M
 import Control.Concurrent
 import Control.DeepSeq (rnf)
 import Control.Exception
-import Data.Aeson
+import Data.Aeson.Extends
 import Data.Tree
 import Notmuch.Class
 import Notmuch.Message
@@ -142,7 +142,7 @@ notmuchWithInput args input = do
 search :: [String] -> IO (Either String [SearchResult])
 search args =
     notmuch ("search" : "--format=json" : "--format-version=2" : args)
-        >>= return . eitherDecode'
+        >>= return . eitherDecodeLenient'
 
 
 data ReplyTo = ToAll | ToSender
@@ -158,7 +158,7 @@ notmuchReply replyTo term =
         , "--reply-to=" ++ show replyTo
         , term
         ]
- --       >>= return . eitherDecode'
+ --       >>= return . eitherDecodeLenient'
 
 
 notmuchShow :: String -> IO (Forest Message)
@@ -167,7 +167,7 @@ notmuchShow term = do
                    , term ]
     -- TODO why head?
     return $ threadForest $ head $
-        either error id (eitherDecode' c')
+        either error id (eitherDecodeLenient' c')
 
 
 notmuchShowPart :: String -> Int -> IO (Either String MessagePart)
@@ -178,7 +178,7 @@ notmuchShowPart term partId = do
                  , "--part=" <> show partId
                  , term ]
     return $ case exitCode of
-        ExitSuccess -> eitherDecode' out
+        ExitSuccess -> eitherDecodeLenient' out
         _ -> Left $ show exitCode <> ": " <> LBS8.unpack err
 
 
