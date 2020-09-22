@@ -2,11 +2,40 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Main (main, mainWithArgs) where
+module Main (main) where
 
+import Action
+import Blessings.String
+import Control.Concurrent
+import Control.DeepSeq (rnf)
+import Control.Exception
+import Control.Monad
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Except
+import Core
+import Data.Aeson (eitherDecode')
+import Data.CaseInsensitive (CI)
+import Data.Foldable (foldrM)
+import Data.List (intercalate)
+import Data.Maybe
+import Data.Time
+import ParseMail (readMail)
+import Safe
+import Scanner
+import State
+import System.Directory
+import System.Environment
+import System.Exit
+import System.IO
+import System.Process
+import TagUtils
+import Text.Hyphenation
+import Text.LineBreak
+import TreeSearch
+import TreeView
+import Utils
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS8
-import           Data.CaseInsensitive   (CI)
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -16,264 +45,43 @@ import qualified Network.Mail.Mime as M
 import qualified Notmuch
 import qualified Notmuch.Message as Notmuch
 import qualified Notmuch.SearchResult as Notmuch
-import qualified System.Console.Terminal.Size as Term
-import Blessings.String (Blessings(Plain,SGR),pp)
-import qualified Blessings.Internal as Blessings
-import Action
-import Control.Concurrent
-import Control.Exception
-import Control.Monad
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except
-import Data.Aeson (eitherDecode')
-import Data.Foldable (foldrM)
-import Data.List (intercalate)
-import Data.Maybe
-import Data.Time
-import Event
-import ParseMail (readMail)
-import RenderTreeView (renderTreeView)
-import Scanner (scan,Scan(..))
-import Screen
-import Safe
-import State
-import System.Directory
-import System.Console.Docopt.NoTH (getArgWithDefault, parseArgsOrExit, parseUsageOrExit, shortOption)
-import System.Environment
-import System.Exit
-import System.IO
-import System.Posix.Signals
-import System.Process
-import TagUtils
-import Text.Hyphenation
-import Text.LineBreak
-import TreeSearch
-import TreeView
-import TreeZipperUtils (modifyFirstParentLabelWhere)
-import Utils
-
-import Control.DeepSeq (rnf)
-
--- | Fork a thread while doing something else, but kill it if there's an
--- exception.
---
--- This is important in the cases above because we want to kill the thread
--- that is holding the Handle lock, because when we clean up the process we
--- try to close that handle, which could otherwise deadlock.
---
-withForkWait :: IO () -> (IO () ->  IO a) -> IO a
-withForkWait async body = do
-  waitVar <- newEmptyMVar :: IO (MVar (Either SomeException ()))
-  mask $ \restore -> do
-    tid <- forkIO $ try (restore async) >>= putMVar waitVar
-    let wait = takeMVar waitVar >>= either throwIO return
-    restore (body wait) `onException` killThread tid
-
-
-initState :: String -> IO State
-initState query = do
-    r_ <- either error id <$> Notmuch.search
-                                [ "--offset=0"
-                                , "--limit=100"
-                                , query
-                                ]
-
-    return State
-        { cursor = Z.fromTree $ fromSearchResults query r_
-        , xoffset = 0
-        , yoffset = 0
-        , flashMessage = "Welcome to much; quit with ^C"
-        , screenWidth = 0
-        , screenHeight = 0
-        , headBuffer = []
-        , treeBuffer = []
-        , now = UTCTime (fromGregorian 1984 5 23) 49062
-        , signalHandlers = []
-        }
-
 
 main :: IO ()
 main =
-    getArgs >>= mainWithArgs
-
-
-mainWithArgs :: [String] -> IO ()
-mainWithArgs args = do
-    usage' <- parseUsageOrExit usage
-    args' <- parseArgsOrExit usage' args
-    let query = getArgWithDefault args' defaultSearch (shortOption 'q')
-    withScreen s0 (\_-> initState query >>= runState)
-  where
-    usage = unlines
-      [ "Command-line MUA using notmuch."
-      , ""
-      , "Usage:"
-      , "  much [-q <search-term>]"
-      , ""
-      , "Options:"
-      , "  -q <search-term>, --query=<search-term>"
-      , "        Open specific search, defaults to " ++ (show defaultSearch)
-      ]
-    defaultSearch = "tag:inbox AND NOT tag:killed"
-
-    s0 = Screen False NoBuffering (BlockBuffering $ Just 4096)
-            [ 1000 -- X & Y on button press and release
-            , 1005 -- UTF-8 mouse mode
-            , 1047 -- use alternate screen buffer
-            ]
-            [   25 -- hide cursor
-            ]
-
-runState :: State -> IO ()
-runState q0 = do
-
-    -- load-env hack
-    maybe (return ()) (setEnv "HOME") =<< lookupEnv "OLDHOME"
-
-    (putEvent, getEvent) <- do
-        v <- newEmptyMVar
-        return (putMVar v, takeMVar v)
-
-    let q1 = q0 { signalHandlers =
-                    [ (sigINT, putEvent EShutdown)
-                    , (28, winchHandler putEvent)
-                    ] }
-
-    installHandlers (signalHandlers q1)
-
-    threadIds <- mapM forkIO
-        [ forever $ scan stdin >>= putEvent . EScan
-        ]
-
-    winchHandler putEvent
-
-    run getEvent q1
-    mapM_ killThread threadIds
-
-
-installHandlers :: [(Signal, IO ())] -> IO ()
-installHandlers =
-    mapM_ (\(s, h) -> installHandler s (Catch h) Nothing)
-
-uninstallHandlers :: [(Signal, IO ())] -> IO ()
-uninstallHandlers =
-    mapM_ (\(s, _) -> installHandler s Ignore Nothing)
-
-withoutHandlers :: (State -> IO State) -> State -> IO State
-withoutHandlers f q@State{..} =
-    bracket_ (uninstallHandlers signalHandlers)
-             (installHandlers signalHandlers)
-             (f q)
-
-
-winchHandler :: (Event -> IO ()) -> IO ()
-winchHandler putEvent =
-    Term.size >>= \case
-        Just (Term.Window {Term.width = w, Term.height = h}) ->
-            putEvent $ EResize w h
-        Nothing ->
-            return ()
-
-
-run :: IO Event -> State -> IO ()
-run getEvent = rec . Right where
-    rec = \case
-        Right q -> rec =<< do
-            t <- getCurrentTime
-            let q' = render q { now = t }
-            redraw q' >> getEvent >>= processEvent q'
-        Left _q -> return ()
-
-
-processEvent :: State -> Event -> IO (Either State State)
-processEvent q = \case
-    EFlash t ->
-        return $ Right q { flashMessage = t }
-    EScan (ScanKey s) ->
-        Right <$> keymap s q
-    EScan info@ScanMouse{..} ->
-        Right <$> mousemap info q
-    EShutdown ->
-        return $ Left q
-    EResize w h ->
-        return $ Right q
-            { screenWidth = w, screenHeight = h
-            , flashMessage = Plain $ "resize " <> show (w,h)
-            }
-    ev ->
-        return $ Right q
-            { flashMessage = SGR [31,1] $ Plain $ "unhandled event: " <> show ev
-            }
-
-
-render :: State -> State
-render q@State{..} =
-    q { treeBuffer = newTreeBuf
-      , headBuffer = newHeadBuf
+    mainWithState emptyState
+      { keymap = myKeymap
+      , mousemap = myMousemap
       }
-  where
-    newTreeBuf = renderTreeView now cursor (Z.root cursor)
-    newHeadBuf =
-        [ Plain (show screenWidth) <> "x" <> Plain (show screenHeight)
-          <> " " <> Plain (show $ linearPos cursor - yoffset)
-          <> " " <> Plain (show $ topOverrun q)
-          <> " " <> Plain (show $ botOverrun q)
-          <> " " <> flashMessage
-          <> " " <> Plain (show (xoffset, yoffset))
-        ]
 
-render0 :: State -> [Blessings String]
-render0 _q@State{..} = do
-    let buffer =
-            map (Blessings.take screenWidth . Blessings.drop xoffset) $
-            take screenHeight $
-            headBuffer ++ drop yoffset treeBuffer
-    buffer ++ take (screenHeight - length buffer) (repeat "~")
+myKeymap :: String -> State -> IO State
 
-
-redraw :: State -> IO ()
-redraw q@State{..} = do
-    hPutStr stdout $ map (sub '\t' ' ') $ "\ESC[H" ++ (pp $ mintercalate "\n" $ map eraseRight $ render0 q)
-    hFlush stdout
-  where
-    sub x x' c = if c == x then x' else c
-    eraseRight s =
-        if Blessings.length s < screenWidth
-            then s <> "\ESC[K"
-            else s
-
-
-
-
-keymap :: String -> State -> IO State
-
-keymap "A" = attachFilesToDraft
-keymap "a" = toggleTagAtCursor "inbox"
-keymap "s" = toggleTagAtCursor "unread"
-keymap "&" = toggleTagAtCursor "killed"
-keymap "*" = toggleTagAtCursor "star"
-keymap "r" = replyToAll
-keymap "e" = withoutHandlers viewSource
-keymap "t" = withoutHandlers editTagsAtCursor
-keymap "k" = moveCursorUp 1
-keymap "j" = moveCursorDown 1
-keymap "K" = moveTreeDown 1
-keymap "J" = moveTreeUp 1
-keymap "\ESC[A" = moveCursorUp 1
-keymap "\ESC[B" = moveCursorDown 1
-keymap "\ESC[a" = moveTreeDown 1
-keymap "\ESC[b" = moveTreeUp 1
-keymap "\ESC[c" = moveTreeLeft 1  -- S-Right
-keymap "\ESC[d" = moveTreeRight 1 -- S-Left
-keymap "\ESC[5~" = \q -> moveTreeDown (screenHeight q `div` 2) q  -- PgUp
-keymap "\ESC[6~" = \q -> moveTreeUp (screenHeight q `div` 2) q    -- PgDn
-keymap "\n" = toggleFold
-keymap "\ESC[Z" = moveCursorUpToPrevUnread -- S-Tab
-keymap "\t" = moveCursorDownToNextUnread
-keymap "\DEL" = moveToParent  -- backspace
+myKeymap "A" = attachFilesToDraft
+myKeymap "a" = toggleTagAtCursor "inbox"
+myKeymap "s" = toggleTagAtCursor "unread"
+myKeymap "&" = toggleTagAtCursor "killed"
+myKeymap "*" = toggleTagAtCursor "star"
+myKeymap "r" = replyToAll
+myKeymap "e" = withoutHandlers viewSource
+myKeymap "t" = withoutHandlers editTagsAtCursor
+myKeymap "k" = moveCursorUp 1
+myKeymap "j" = moveCursorDown 1
+myKeymap "K" = moveTreeDown 1
+myKeymap "J" = moveTreeUp 1
+myKeymap "\ESC[A" = moveCursorUp 1
+myKeymap "\ESC[B" = moveCursorDown 1
+myKeymap "\ESC[a" = moveTreeDown 1
+myKeymap "\ESC[b" = moveTreeUp 1
+myKeymap "\ESC[c" = moveTreeLeft 1  -- S-Right
+myKeymap "\ESC[d" = moveTreeRight 1 -- S-Left
+myKeymap "\ESC[5~" = \q -> moveTreeDown (screenHeight q `div` 2) q  -- PgUp
+myKeymap "\ESC[6~" = \q -> moveTreeUp (screenHeight q `div` 2) q    -- PgDn
+myKeymap "\n" = toggleFold
+myKeymap "\ESC[Z" = moveCursorUpToPrevUnread -- S-Tab
+myKeymap "\t" = moveCursorDownToNextUnread
+myKeymap "\DEL" = moveToParent  -- backspace
 
 -- TODO wrap/unwrap to separate module
-keymap "=" = \q@State{..} ->
+myKeymap "=" = \q@State{..} ->
     let cursor' = case Z.label cursor of
             TVMessageLine a b c s ->
                 wrap (TVMessageLine a b c) cursor s
@@ -304,14 +112,14 @@ keymap "=" = \q@State{..} ->
         hyp = Just german_1996
         bf = BreakFormat 80 8 shy hyp
 
-keymap "\ESCq" = editSearchTerm
+myKeymap "\ESCq" = editSearchTerm
 
 -- <F1>
-keymap "\ESC[11~" = \q@State{..} ->
+myKeymap "\ESC[11~" = \q@State{..} ->
     return q { flashMessage = Plain $ show $ treeViewId $ Z.label cursor }
 
 -- <F2>
-keymap "\ESC[12~" = \q@State{..} ->
+myKeymap "\ESC[12~" = \q@State{..} ->
     return q { flashMessage =
                   Plain $
                   show $
@@ -321,22 +129,42 @@ keymap "\ESC[12~" = \q@State{..} ->
               }
 
 -- TODO Stuff Vim sends after exit (also there is more...)
-keymap "\ESC[2;2R" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
-keymap "\ESC[>85;95;0c" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
+myKeymap "\ESC[2;2R" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
+myKeymap "\ESC[>85;95;0c" = \q -> return q { flashMessage = flashMessage q <> " " <> Plain "stupid" }
 
-keymap s = \q ->
-    return q { flashMessage = Plain $ show s }
+myKeymap s = displayKey s
 
 
-mousemap :: Scan -> State -> IO State
+myMousemap :: Scan -> State -> IO State
+myMousemap ScanMouse{mouseButton=1,mouseY=y} = defaultMouse1Click y
+myMousemap ScanMouse{mouseButton=3,mouseY=y} = \q -> defaultMouse1Click y q >>= toggleFold
+myMousemap ScanMouse{mouseButton=4} = moveTreeDown 3
+myMousemap ScanMouse{mouseButton=5} = moveTreeUp 3
+myMousemap ScanMouse{mouseButton=0} = return
+myMousemap info = displayMouse info
 
-mousemap ScanMouse{mouseButton=1,mouseY=y} = defaultMouse1Click y
-mousemap ScanMouse{mouseButton=3,mouseY=y} = \q -> defaultMouse1Click y q >>= toggleFold
-mousemap ScanMouse{mouseButton=4} = moveTreeDown 3
-mousemap ScanMouse{mouseButton=5} = moveTreeUp 3
-mousemap ScanMouse{mouseButton=0} = return
-mousemap info = \q ->
-    return q { flashMessage = SGR [38,5,202] $ Plain $ show info }
+
+withoutHandlers :: (State -> IO State) -> State -> IO State
+withoutHandlers f q@State{..} =
+    bracket_ (uninstallHandlers signalHandlers)
+             (installHandlers signalHandlers)
+             (f q)
+
+
+-- | Fork a thread while doing something else, but kill it if there's an
+-- exception.
+--
+-- This is important in the cases above because we want to kill the thread
+-- that is holding the Handle lock, because when we clean up the process we
+-- try to close that handle, which could otherwise deadlock.
+--
+withForkWait :: IO () -> (IO () ->  IO a) -> IO a
+withForkWait async body = do
+  waitVar <- newEmptyMVar :: IO (MVar (Either SomeException ()))
+  mask $ \restore -> do
+    tid <- forkIO $ try (restore async) >>= putMVar waitVar
+    let wait = takeMVar waitVar >>= either throwIO return
+    restore (body wait) `onException` killThread tid
 
 
 attachFilesToDraft :: State -> IO State
