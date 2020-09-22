@@ -42,6 +42,11 @@ emptyState = State
     , signalHandlers = []
     , keymap = displayKey
     , mousemap = displayMouse
+    , tagVisuals =
+        [ ("killed", SGR [38,5,088])
+        , ("star", SGR [38,5,226])
+        , ("draft", SGR [38,5,202])
+        ]
     }
 
 withQuery :: String -> State -> IO State
@@ -165,7 +170,7 @@ render q@State{..} =
       , headBuffer = newHeadBuf
       }
   where
-    newTreeBuf = renderTreeView now cursor (Z.root cursor)
+    newTreeBuf = renderTreeView q (Z.root cursor)
     newHeadBuf =
         [ Plain (show screenWidth) <> "x" <> Plain (show screenHeight)
           <> " " <> Plain (show $ linearPos cursor - yoffset)
@@ -194,6 +199,3 @@ redraw q@State{..} = do
         if Blessings.length s < screenWidth
             then s <> "\ESC[K"
             else s
-
-
-

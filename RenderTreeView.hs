@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module RenderTreeView (renderTreeView) where
 
@@ -16,6 +17,7 @@ import Data.Char
 import Data.Time
 import Data.Time.Format.Human
 import Data.Tree
+import State
 import TagUtils (Tag)
 import TreeView
 
@@ -43,14 +45,13 @@ humanTimeLocale = defaultHumanTimeLocale
 
 
 renderTreeView
-    :: UTCTime
-    -> Z.TreePos Z.Full TreeView
+    :: State
     -> Z.TreePos Z.Full TreeView
     -> [Blessings String]
-renderTreeView now cur =
+renderTreeView q@State{..} =
     renderNode
   where
-    isFocus = (Z.label cur==) . Z.label
+    isFocus = (Z.label cursor==) . Z.label
 
     renderNode loc =
         renderRootLabel loc :
@@ -58,7 +59,7 @@ renderTreeView now cur =
 
     renderRootLabel loc =
         renderPrefix loc <>
-        renderTreeView1 now (isFocus loc) (Z.label loc)
+        renderTreeView1 q (isFocus loc) (Z.label loc)
 
     renderSubForest loc =
         renderNode loc ++
@@ -115,9 +116,6 @@ searchSGR
     , boringMessageSGR
     , unreadMessageSGR
     , unreadSearchSGR
-    , killedTagSGR
-    , starTagSGR
-    , draftTagSGR
     :: Blessings String -> Blessings String
 
 altSGR = SGR [38,5,182]
@@ -128,17 +126,14 @@ boringSGR = SGR [38,5,240]
 prefixSGR = SGR [38,5,235]
 dateSGR = SGR [38,5,071]
 tagsSGR = SGR [38,5,036]
-killedTagSGR = SGR [38,5,088]
-starTagSGR = SGR [38,5,226]
-draftTagSGR = SGR [38,5,202]
 
 boringMessageSGR = SGR [38,5,023]
 unreadMessageSGR = SGR [38,5,117]
 unreadSearchSGR = SGR [38,5,250]
 
 
-renderTreeView1 :: UTCTime -> Bool -> TreeView -> Blessings String
-renderTreeView1 now hasFocus x = case x of
+renderTreeView1 :: State -> Bool -> TreeView -> Blessings String
+renderTreeView1 q@State{..} hasFocus x = case x of
 
     TVSearch s ->
         let c = if hasFocus then focusSGR else searchSGR
@@ -159,7 +154,7 @@ renderTreeView1 now hasFocus x = case x of
             authors = Plain $ T.unpack $ Notmuch.searchAuthors sr
             date = dateSGR $ renderDate now x
             subject = Plain $ T.unpack $ Notmuch.searchSubject sr
-            tags = tagsSGR $ renderTags (Notmuch.searchTags sr)
+            tags = tagsSGR $ renderTags q (Notmuch.searchTags sr)
             title = if subject /= "" then subject else c_authors authors
         in
           c $ title <> " " <> date <> " " <> tags
@@ -171,7 +166,7 @@ renderTreeView1 now hasFocus x = case x of
                 | otherwise = boringMessageSGR
             from = fromSGR $ renderFrom (M.lookup "from" $ Notmuch.messageHeaders m)
             date = dateSGR $ renderDate now x
-            tags = tagsSGR $ renderTags (Notmuch.messageTags m) -- TODO filter common tags
+            tags = tagsSGR $ renderTags q (Notmuch.messageTags m) -- TODO filter common tags
         in from <> " " <> date <> " " <> tags
 
     TVMessageHeaderField m fieldName ->
@@ -219,18 +214,16 @@ renderFrom = \case
     Nothing -> SGR [35,1] "Anonymous"
 
 
-renderTags :: [Tag] -> Blessings String
-renderTags =
+renderTags :: State -> [Tag] -> Blessings String
+renderTags state =
     -- TODO sort somewhere else
-    mconcat . L.intersperse " " . map renderTag . L.sort
+    mconcat . L.intersperse " " . map (renderTag state) . L.sort
 
 
-renderTag :: Tag -> Blessings String
-renderTag tag = case tag of
-    "draft" -> draftTagSGR plain
-    "killed" -> killedTagSGR plain
-    "star" -> starTagSGR plain
-    _ -> plain
+renderTag :: State -> Tag -> Blessings String
+renderTag state tag = case lookup tag (tagVisuals state) of
+    Just visual -> visual plain
+    Nothing -> plain
   where
     plain = Plain $ T.unpack tag
 
