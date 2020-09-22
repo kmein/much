@@ -4,6 +4,7 @@
 module Action where
 
 import Blessings.String
+import Scanner
 import State
 import TagUtils
 import TreeSearch
@@ -14,6 +15,14 @@ import qualified Data.Tree.Zipper as Z
 import qualified Notmuch
 import qualified Notmuch.Message as Notmuch
 import qualified Notmuch.SearchResult as Notmuch
+
+displayKey :: String -> State -> IO State
+displayKey s q = return q { flashMessage = Plain $ show s }
+
+
+displayMouse :: Scan -> State -> IO State
+displayMouse info q =
+    return q { flashMessage = SGR [38,5,202] $ Plain $ show info }
 
 defaultMouse1Click :: Monad m => Int -> State -> m State
 defaultMouse1Click y q@State{..} = do

@@ -3,6 +3,7 @@ module State where
 import Blessings.String (Blessings)
 import Data.Time
 import qualified Data.Tree.Zipper as Z
+import Scanner
 import System.Posix.Signals
 import TreeView (TreeView)
 
@@ -17,4 +18,6 @@ data State = State
     , treeBuffer :: [Blessings String]
     , now :: UTCTime
     , signalHandlers :: [(Signal, IO ())]
+    , keymap :: String -> State -> IO State
+    , mousemap :: Scan -> State -> IO State
     }
