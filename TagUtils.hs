@@ -1,6 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module TagUtils where
 
@@ -29,8 +27,8 @@ diffTags :: [Tag] -> [Tag] -> [TagOp]
 diffTags old new =
     let oldTags = Set.fromList old
         newTags = Set.fromList new
-    in (map DelTag $ Set.toList $ oldTags `Set.difference` newTags) ++
-       (map AddTag $ Set.toList $ newTags `Set.difference` oldTags)
+    in map DelTag (Set.toList $ oldTags `Set.difference` newTags) ++
+       map AddTag (Set.toList $ newTags `Set.difference` oldTags)
 
 
 patchRootLabelTags :: [TagOp] -> Tree TreeView -> Tree TreeView

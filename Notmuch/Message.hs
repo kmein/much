@@ -102,7 +102,7 @@ instance FromJSON Message where
                                    <*> v .: "tags"
                                    <*> v .: "filename"
     parseJSON (Array _) = return $ Message (MessageID "") defTime M.empty [] True False [] ""
-        where defTime = UTCTime (ModifiedJulianDay 0) (fromInteger 0)
+        where defTime = UTCTime (ModifiedJulianDay 0) 0
     parseJSON x = fail $ "Error parsing message: " ++ show x
 
 hasTag :: T.Text -> Message -> Bool
@@ -110,10 +110,10 @@ hasTag tag = (tag `elem`) . messageTags
 
 
 
-data Thread = Thread { threadForest :: TR.Forest Message }
+newtype Thread = Thread { threadForest :: TR.Forest Message }
 
 instance FromJSON Thread where
-    parseJSON (Array vs) = Thread <$> (mapM parseTree $ V.toList vs)
+    parseJSON (Array vs) = Thread <$> mapM parseTree (V.toList vs)
     parseJSON _ = fail "Thread is not an array"
 
 parseTree :: Value -> Parser (TR.Tree Message)

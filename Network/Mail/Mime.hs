@@ -143,7 +143,7 @@ partToPair (Part contentType encoding disposition headers content) =
     (headers', builder)
   where
     headers' =
-        ((:) ("Content-Type", contentType))
+        (:) ("Content-Type", contentType)
       $ (case encoding of
             None -> id
             Base64 -> (:) ("Content-Transfer-Encoding", "base64")
@@ -156,7 +156,7 @@ partToPair (Part contentType encoding disposition headers content) =
             Just fn ->
                 (:) ("Content-Disposition", "attachment; filename="
                                             `T.append` fn))
-      $ headers
+      headers
     builder =
         case encoding of
             None -> fromWriteList writeByteString $ L.toChunks content

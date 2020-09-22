@@ -72,7 +72,7 @@ sortTree :: Tree Message -> Tree Message
 sortTree t =
     Tree.Node (Tree.rootLabel t) $
         map sortTree $
-        List.sortBy (comparing $ getMessageDate . Tree.rootLabel) $
+        List.sortOn (getMessageDate . Tree.rootLabel) $
         Tree.subForest t
 
 
@@ -131,7 +131,7 @@ headerMessageIds headerName =
 
 parseMsgIds :: P.SourceName -> Text -> Either P.ParseError [Ident]
 parseMsgIds srcName =
-    either Left (Right . map (Text.init . Text.tail . Text.pack)) .
+    fmap (map (Text.init . Text.tail . Text.pack)) .
     P.parse obs_in_reply_to_parser srcName .
     Text.unpack
   where

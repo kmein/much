@@ -193,9 +193,8 @@ topOverrun State{..} =
 
 botOverrun :: State -> Int
 botOverrun State{..} =
-    max 0 (linearPos cursor - yoffset - (screenHeight - (length headBuffer) - 1))
+    max 0 (linearPos cursor - yoffset - (screenHeight - length headBuffer - 1))
 
 
 setSubForest :: Tree.Forest a -> Tree.Tree a -> Tree.Tree a
 setSubForest sf t = t { Tree.subForest = sf }
-

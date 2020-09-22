@@ -93,7 +93,7 @@ xconvPart m p =
   where
     contents = case partContent p of
         ContentText t ->
-            map (xconvLine m p) $ zip [0..] (T.lines t)
+            zipWith (curry $ xconvLine m p) [0..] (T.lines t)
         ContentMultipart parts ->
             map (xconvPart m) parts
         ContentMsgRFC822 _ ->
@@ -145,14 +145,14 @@ loadSubForest = \case
                     . subForest
                     $ xconvPart m mp'
 
-    TVSearchResult sr -> do
+    TVSearchResult sr ->
         Right
             . unloadPartsWithFilename
             . map unloadReadSubForests
             . fromMessageForest
             <$> notmuchShow (termFromSearchResult sr)
 
-    TVSearch s -> do
+    TVSearch s ->
         Right
             . subForest
             . fromSearchResults s
@@ -180,9 +180,9 @@ unloadSubForest t = case rootLabel t of
 hasUnloadedSubForest :: Tree TreeView -> Bool
 hasUnloadedSubForest t = case rootLabel t of
     TVMessage _ ->
-        null $ filter (not . isTVMessage . rootLabel) $ subForest t
+        all (isTVMessage . rootLabel) $ subForest t
     TVMessagePart _ _ ->
-        null $ filter (not . isTVMessagePart . rootLabel) $ subForest t
+        all (isTVMessagePart . rootLabel) $ subForest t
     _ ->
         null $ subForest t
 

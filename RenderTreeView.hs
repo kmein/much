@@ -70,7 +70,7 @@ renderTreeView now cur =
 
 renderPrefix :: Z.TreePos Z.Full TreeView -> Blessings String
 renderPrefix =
-    mconcat . reverse . map prefix . zip [(1 :: Int)..] . Z.path
+    mconcat . reverse . zipWith (curry prefix) [(1 :: Int)..] . Z.path
   where
     prefix (i, (_lhs, x, rhs)) = case x of
         TVSearch _ -> ""
@@ -86,7 +86,7 @@ renderPrefix =
                         then spacePrefix
                         else pipePrefix
         _ ->
-            if null $ filter isTVMessage $ map rootLabel rhs
+            if not $ any (isTVMessage . rootLabel) rhs
                 then spacePrefix
                 else pipePrefix
 
@@ -145,15 +145,14 @@ renderTreeView1 now hasFocus x = case x of
         in c $ Plain s
 
     TVSearchResult sr ->
-        let c = if hasFocus then focusSGR else
-                    if isUnread
-                        then unreadSearchSGR
-                        else boringSGR
-            c_authors =
-                if hasFocus then focusSGR else
-                    if isUnread
-                        then altSGR
-                        else boringSGR
+        let c
+                | hasFocus = focusSGR
+                | isUnread = unreadSearchSGR
+                | otherwise = boringSGR
+            c_authors
+                | hasFocus = focusSGR
+                | isUnread = altSGR
+                | otherwise = boringSGR
 
             isUnread = "unread" `elem` Notmuch.searchTags sr
 
@@ -166,11 +165,10 @@ renderTreeView1 now hasFocus x = case x of
           c $ title <> " " <> date <> " " <> tags
 
     TVMessage m ->
-        let fromSGR =
-                if hasFocus then focusSGR else
-                    if "unread" `elem` Notmuch.messageTags m
-                        then unreadMessageSGR
-                        else boringMessageSGR
+        let fromSGR
+                | hasFocus = focusSGR
+                | "unread" `elem` Notmuch.messageTags m = unreadMessageSGR
+                | otherwise = boringMessageSGR
             from = fromSGR $ renderFrom (M.lookup "from" $ Notmuch.messageHeaders m)
             date = dateSGR $ renderDate now x
             tags = tagsSGR $ renderTags (Notmuch.messageTags m) -- TODO filter common tags
@@ -239,6 +237,6 @@ renderTag tag = case tag of
 
 dropAddress :: String -> String
 dropAddress xs =
-    case L.findIndices (=='<') xs of
+    case L.elemIndices '<' xs of
         [] -> xs
         is -> L.dropWhileEnd isSpace $ take (last is) xs

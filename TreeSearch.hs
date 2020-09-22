@@ -32,9 +32,7 @@ findPrev :: TreePos Full a -> Maybe (TreePos Full a)
 findPrev loc =
     case prev loc of
         Just x -> trans_lastChild x
-        Nothing -> case parent loc of
-            Just x -> Just x
-            Nothing -> Nothing
+        Nothing -> parent loc
   where
     trans_lastChild x =
         case lastChild x of

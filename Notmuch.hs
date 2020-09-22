@@ -141,8 +141,8 @@ notmuchWithInput args input = do
 
 search :: [String] -> IO (Either String [SearchResult])
 search args =
-    notmuch ("search" : "--format=json" : "--format-version=2" : args)
-        >>= return . eitherDecodeLenient'
+    eitherDecodeLenient' <$>
+        notmuch ("search" : "--format=json" : "--format-version=2" : args)
 
 
 data ReplyTo = ToAll | ToSender

@@ -181,12 +181,12 @@ render0 _q@State{..} = do
             map (Blessings.take screenWidth . Blessings.drop xoffset) $
             take screenHeight $
             headBuffer ++ drop yoffset treeBuffer
-    buffer ++ take (screenHeight - length buffer) (repeat "~")
+    buffer ++ replicate (screenHeight - length buffer) "~"
 
 
 redraw :: State -> IO ()
 redraw q@State{..} = do
-    hPutStr stdout $ map (sub '\t' ' ') $ "\ESC[H" ++ (pp $ mintercalate "\n" $ map eraseRight $ render0 q)
+    hPutStr stdout $ map (sub '\t' ' ') $ "\ESC[H" ++ pp (mintercalate "\n" $ map eraseRight $ render0 q)
     hFlush stdout
   where
     sub x x' c = if c == x then x' else c
