@@ -134,18 +134,26 @@ moveCursorDownToNextUnread =
     moveCursorToUnread findNext botOverrun moveTreeUp
 
 
-toggleFold :: State -> IO State
-toggleFold q@State{..} =
-    getNewSubForest >>= return . \case
+openFold :: State -> IO State
+openFold q@State{..} =
+    handle <$> loadSubForest (Z.label cursor)
+  where
+    handle = \case
         Left err ->
             q { flashMessage = SGR [31] $ Plain err }
         Right sf ->
             q { cursor = Z.modifyTree (setSubForest sf) cursor }
-  where
-    getNewSubForest =
-        if hasUnloadedSubForest (Z.tree cursor)
-            then loadSubForest (Z.label cursor)
-            else return $ Right $ unloadSubForest (Z.tree cursor)
+
+closeFold :: State -> IO State
+closeFold q@State{..} =
+    let sf = unloadSubForest (Z.tree cursor)
+     in return q { cursor = Z.modifyTree (setSubForest sf) cursor }
+
+toggleFold :: State -> IO State
+toggleFold q@State{..} =
+    if hasUnloadedSubForest (Z.tree cursor)
+        then openFold q
+        else closeFold q
 
 
 toggleTagAtCursor :: Tag -> State -> IO State
