@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 
-module TreeView
+module Much.TreeView
     ( module Export
     , getMessage
     , getSearchTerm
@@ -23,7 +23,7 @@ import Data.Tree
 import Notmuch
 import Notmuch.Message
 import Notmuch.SearchResult
-import TreeView.Types as Export
+import Much.TreeView.Types as Export
 
 
 getMessage :: TreeView -> Maybe Message

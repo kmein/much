@@ -1,4 +1,4 @@
-module TreeSearch where
+module Much.TreeSearch where
 
 import Data.Tree.Zipper
 

@@ -15,11 +15,11 @@ import Data.Tree
 import Notmuch.Class
 import Notmuch.Message
 import Notmuch.SearchResult
-import ParseMail (readMail)
+import Much.ParseMail (readMail)
 import System.Exit
 import System.IO
 import System.Process
-import TagUtils
+import Much.TagUtils
 
 
 -- | Fork a thread while doing something else, but kill it if there's an

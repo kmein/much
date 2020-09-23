@@ -1,4 +1,4 @@
-module TreeZipperUtils where
+module Much.TreeZipperUtils where
 
 import Data.Maybe
 import Data.Tree

@@ -1,4 +1,4 @@
-module MappedSets (invert, mk) where
+module Much.MappedSets (invert, mk) where
 
 import           Control.Arrow
 import           Data.Map.Strict   (Map)

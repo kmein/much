@@ -3,9 +3,11 @@
 
 module Main (main) where
 
-import Action
-import Core
-import State
+import Much.Action
+import Much.Core
+import Much.State
+import Much.TreeView
+import qualified Notmuch.Message as Notmuch
 
 import Blessings.String
 import Control.Monad
@@ -14,10 +16,8 @@ import Scanner
 import System.Posix.Signals
 import Text.Hyphenation
 import Text.LineBreak
-import TreeView
 import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
-import qualified Notmuch.Message as Notmuch
 
 {- notmuch's special tags are:
 

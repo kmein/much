@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module TreeView.Types where
+module Much.TreeView.Types where
 
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text as T

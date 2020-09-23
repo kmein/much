@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module MBox
+module Much.MBox
     (
       -- TODO don't re-export MBox but use our own Message type
       module Export

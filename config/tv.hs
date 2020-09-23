@@ -4,7 +4,7 @@
 
 module Main (main) where
 
-import Action
+import Much.Action
 import Blessings.String
 import Control.Concurrent
 import Control.DeepSeq (rnf)
@@ -12,28 +12,28 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
-import Core
+import Much.Core
 import Data.Aeson (eitherDecode')
 import Data.CaseInsensitive (CI)
 import Data.Foldable (foldrM)
 import Data.List (intercalate)
 import Data.Maybe
 import Data.Time
-import ParseMail (readMail)
+import Much.ParseMail (readMail)
 import Safe
 import Scanner
-import State
+import Much.State
 import System.Directory
 import System.Environment
 import System.Exit
 import System.IO
 import System.Process
-import TagUtils
+import Much.TagUtils
 import Text.Hyphenation
 import Text.LineBreak
-import TreeSearch
-import TreeView
-import Utils
+import Much.TreeSearch
+import Much.TreeView
+import Much.Utils
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS8
 import qualified Data.CaseInsensitive as CI

@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module Screen (Screen(..), setScreen, withScreen) where
+module Much.Screen (Screen(..), setScreen, withScreen) where
 
 import Control.Exception
 import Data.List

@@ -6,38 +6,101 @@ maintainer:     tv@krebsco.de
 build-type:     Simple
 cabal-version:  >=1.10
 
-executable much
-  main-is: test5.hs
-  build-depends:  base
-                , aeson
-                , attoparsec
-                , base64-bytestring
-                , blaze-builder
-                , blessings
-                , bytestring
-                , case-insensitive
-                , containers
-                , deepseq
-                , directory
-                , docopt
-                , email-header
-                , filepath
-                , friendly-time
-                , hyphenation
-                , linebreak
-                , old-locale
-                , process
-                , random
-                , rosezipper
-                , safe
-                , scanner
-                , split
-                , terminal-size
-                , text
-                , time
-                , transformers
-                , transformers-compat
-                , unix
-                , vector
+executable much-tv
+  hs-source-dirs:   config
+  main-is:          tv.hs
+  default-language: Haskell2010
+  ghc-options:      -O2 -threaded -with-rtsopts=-N
+  build-depends:    much
+                  , base
+                  , blessings
+                  , deepseq
+                  , transformers
+                  , aeson
+                  , case-insensitive
+                  , time
+                  , safe
+                  , scanner
+                  , directory
+                  , hyphenation
+                  , linebreak
+                  , bytestring
+                  , process
+                  , text
+                  , containers
+                  , rosezipper
+
+executable much-kmein
+  hs-source-dirs:   config
+  main-is:          kmein.hs
+  default-language: Haskell2010
+  ghc-options:      -O2 -threaded -with-rtsopts=-N
+  build-depends:    much
+                  , base
+                  , unix
+                  , scanner
+                  , blessings
+                  , hyphenation
+                  , linebreak
+                  , containers
+                  , rosezipper
+
+library
+  hs-source-dirs:  src
+  exposed-modules: Much.Core
+                 , Much.Action
+                 , Much.Event
+                 , Much.ParseMail
+                 , Much.RenderTreeView
+                 , Much.Screen
+                 , Much.State
+                 , Much.TagUtils
+                 , Much.TreeSearch
+                 , Much.TreeView
+                 , Much.TreeView.Types
+                 , Much.TreeZipperUtils
+                 , Much.Utils
+                 , Network.Mail.Mime
+                 , Notmuch
+                 , Notmuch.Class
+                 , Notmuch.Message
+                 , Notmuch.SearchResult
+  other-modules:   Codec.MIME.Base64
+                 , Codec.MIME.Decode
+                 , Codec.MIME.Parse
+                 , Codec.MIME.QuotedPrintable
+                 , Codec.MIME.Type
+                 , Data.Aeson.Extends
+  build-depends:   base
+                 , aeson
+                 , attoparsec
+                 , base64-bytestring
+                 , blaze-builder
+                 , blessings
+                 , bytestring
+                 , case-insensitive
+                 , containers
+                 , deepseq
+                 , directory
+                 , docopt
+                 , email-header
+                 , filepath
+                 , friendly-time
+                 , hyphenation
+                 , linebreak
+                 , old-locale
+                 , process
+                 , random
+                 , rosezipper
+                 , safe
+                 , scanner
+                 , split
+                 , terminal-size
+                 , text
+                 , time
+                 , transformers
+                 , transformers-compat
+                 , unix
+                 , vector
   default-language: Haskell2010
   ghc-options: -O2 -Wall -threaded

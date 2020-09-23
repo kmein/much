@@ -1,4 +1,4 @@
-module Event where
+module Much.Event where
 
 import Blessings
 import Scanner

@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module RenderTreeView (renderTreeView) where
+module Much.RenderTreeView (renderTreeView) where
 
 import qualified Notmuch.Message as Notmuch
 import qualified Notmuch.SearchResult as Notmuch
@@ -11,16 +11,16 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Tree.Zipper as Z
-import qualified TreeZipperUtils as Z
+import qualified Much.TreeZipperUtils as Z
 import Blessings
 import Data.Char
 import Data.Maybe
 import Data.Time
 import Data.Time.Format.Human
 import Data.Tree
-import State
-import TagUtils (Tag)
-import TreeView
+import Much.State
+import Much.TagUtils (Tag)
+import Much.TreeView
 
 
 -- TODO make configurable
@@ -127,9 +127,9 @@ renderTreeView1 q@State{..} hasFocus x = case x of
             isUnread = "unread" `elem` Notmuch.searchTags sr
 
             authors = Plain $ T.unpack $ Notmuch.searchAuthors sr
-            date = State.date colorConfig $ renderDate now x
+            date = Much.State.date colorConfig $ renderDate now x
             subject = Plain $ T.unpack $ Notmuch.searchSubject sr
-            tags = State.tags colorConfig $ renderTags q (Notmuch.searchTags sr)
+            tags = Much.State.tags colorConfig $ renderTags q (Notmuch.searchTags sr)
             title = if subject /= "" then subject else c_authors authors
         in
           c $ title <> " " <> date <> " " <> tags
@@ -140,8 +140,8 @@ renderTreeView1 q@State{..} hasFocus x = case x of
                 | "unread" `elem` Notmuch.messageTags m = unreadMessage colorConfig
                 | otherwise = boringMessage colorConfig
             from = fromSGR $ renderFrom (M.lookup "from" $ Notmuch.messageHeaders m)
-            date = State.date colorConfig $ renderDate now x
-            tags = State.tags colorConfig $ renderTags q (Notmuch.messageTags m) -- TODO filter common tags
+            date = Much.State.date colorConfig $ renderDate now x
+            tags = Much.State.tags colorConfig $ renderTags q (Notmuch.messageTags m) -- TODO filter common tags
         in from <> " " <> date <> " " <> tags
 
     TVMessageHeaderField m fieldName ->

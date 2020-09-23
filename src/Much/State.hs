@@ -1,4 +1,4 @@
-module State where
+module Much.State where
 
 import Blessings.String (Blessings)
 import qualified Data.Text as T
@@ -6,7 +6,7 @@ import Data.Time
 import qualified Data.Tree.Zipper as Z
 import Scanner
 import System.Posix.Signals
-import TreeView (TreeView)
+import Much.TreeView (TreeView)
 
 data State = State
     { cursor :: Z.TreePos Z.Full TreeView

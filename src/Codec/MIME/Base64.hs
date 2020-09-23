@@ -1,21 +1,21 @@
 --------------------------------------------------------------------
 -- |
 -- Module    : Codec.MIME.Base64
--- Copyright : (c) 2006-2009, Galois, Inc. 
+-- Copyright : (c) 2006-2009, Galois, Inc.
 -- License   : BSD3
 --
 -- Maintainer: Sigbjorn Finne <sigbjorn.finne@gmail.com>
 -- Stability : provisional
 -- Portability: portable
 --
--- 
+--
 -- Base64 decoding and encoding routines, multiple entry
 -- points for either depending on use and level of control
 -- wanted over the encoded output (and its input form on the
 -- decoding side.)
--- 
+--
 --------------------------------------------------------------------
-module Codec.MIME.Base64 
+module Codec.MIME.Base64
         ( encodeRaw         -- :: Bool -> String -> [Word8]
         , encodeRawString   -- :: Bool -> String -> String
         , encodeRawPrim     -- :: Bool -> Char -> Char -> [Word8] -> String
@@ -64,14 +64,14 @@ encodeRawPrim trail ch62 ch63 ls = encoder ls
   trailer xs ys
    | not trail = xs
    | otherwise = xs ++ ys
-  f = fromB64 ch62 ch63 
+  f = fromB64 ch62 ch63
   encoder []    = []
   encoder [x]   = trailer (take 2 (encode3 f x 0 0 "")) "=="
   encoder [x,y] = trailer (take 3 (encode3 f x y 0 "")) "="
   encoder (x:y:z:ws) = encode3 f x y z (encoder ws)
 
 encode3 :: (Word8 -> Char) -> Word8 -> Word8 -> Word8 -> String -> String
-encode3 f a b c rs = 
+encode3 f a b c rs =
      f (low6 (w24 `shiftR` 18)) :
      f (low6 (w24 `shiftR` 12)) :
      f (low6 (w24 `shiftR` 6))  :
@@ -79,7 +79,7 @@ encode3 f a b c rs =
    where
     w24 :: Word32
     w24 = (fromIntegral a `shiftL` 16) +
-          (fromIntegral b `shiftL` 8)  + 
+          (fromIntegral b `shiftL` 8)  +
            fromIntegral c
 
 decodeToString :: String -> String
@@ -93,7 +93,7 @@ decodePrim ch62 ch63 str =  decoder $ takeUntilEnd str
  where
   takeUntilEnd "" = []
   takeUntilEnd ('=':_) = []
-  takeUntilEnd (x:xs) = 
+  takeUntilEnd (x:xs) =
     case toB64 ch62 ch63 x of
       Nothing -> takeUntilEnd xs
       Just b  -> b : takeUntilEnd xs
@@ -128,7 +128,7 @@ toB64 a b ch
   | otherwise = Nothing
 
 fromB64 :: Char -> Char -> Word8 -> Char
-fromB64 ch62 ch63 x 
+fromB64 ch62 ch63 x
   | x < 26    = chr (ord 'A' + xi)
   | x < 52    = chr (ord 'a' + (xi-26))
   | x < 62    = chr (ord '0' + (xi-52))
@@ -144,4 +144,3 @@ low6 x = fromIntegral (x .&. 0x3f)
 
 lowByte :: Word32 -> Word8
 lowByte x = (fromIntegral x) .&. 0xff
-

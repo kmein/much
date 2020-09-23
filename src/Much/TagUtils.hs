@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module TagUtils where
+module Much.TagUtils where
 
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -9,7 +9,7 @@ import Data.List.Split (wordsBy)
 import Data.Tree
 import Notmuch.Message
 import Notmuch.SearchResult
-import TreeView.Types
+import Much.TreeView.Types
 
 
 type Tag = T.Text

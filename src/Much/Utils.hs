@@ -1,4 +1,4 @@
-module Utils where
+module Much.Utils where
 
 import Control.Exception
 import System.Directory

@@ -1,15 +1,15 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module Action where
+module Much.Action where
 
 import Blessings.String
 import Scanner
-import State
-import TagUtils
-import TreeSearch
-import TreeView
-import TreeZipperUtils
+import Much.State
+import Much.TagUtils
+import Much.TreeSearch
+import Much.TreeView
+import Much.TreeZipperUtils
 import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
 import qualified Notmuch

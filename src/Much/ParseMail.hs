@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module ParseMail (readMail) where
+module Much.ParseMail (readMail) where
 
 import qualified Data.Attoparsec.ByteString.Char8 as A8
 import qualified Data.ByteString as BS

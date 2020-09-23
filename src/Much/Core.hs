@@ -2,25 +2,25 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module Core where
+module Much.Core where
 
-import Action
+import Much.Action
 import Blessings.String (Blessings(Plain,SGR),pp)
 import Control.Concurrent
 import Control.Monad
 import Data.Time
-import Event
-import RenderTreeView (renderTreeView)
+import Much.Event
+import Much.RenderTreeView (renderTreeView)
 import Scanner (scan,Scan(..))
-import Screen
-import State
+import Much.Screen
+import Much.State
 import System.Console.Docopt.NoTH (getArgWithDefault, parseArgsOrExit, parseUsageOrExit, shortOption)
 import System.Environment
 import System.IO
 import System.Posix.Signals
-import TreeSearch
-import TreeView
-import Utils
+import Much.TreeSearch
+import Much.TreeView
+import Much.Utils
 import qualified Blessings.Internal as Blessings
 import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
