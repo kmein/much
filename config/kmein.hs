@@ -1,15 +1,17 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Main (main) where
 
 import Action
-import Blessings.String
 import Core
+import State
+
+import Blessings.String
+import Control.Monad
 import Data.Maybe
 import Scanner
-import State
+import System.Posix.Signals
 import Text.Hyphenation
 import Text.LineBreak
 import TreeView
@@ -17,33 +19,66 @@ import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
 import qualified Notmuch.Message as Notmuch
 
+{- notmuch's special tags are:
+
+  synchonised to maildir: draft flagged passed replied unread
+  automatic: attachment signed encrypted
+  cli default tags: unread inbox deleted spam
+
+ref: https://notmuchmail.org/special-tags/
+-}
+
 main :: IO ()
 main =
     mainWithState emptyState
       { keymap = myKeymap
       , mousemap = myMousemap
+      , colorConfig = (colorConfig emptyState)
+        { tagMap =
+            [ ("deleted", SGR [38,5,088])
+            , ("flagged", SGR [38,5,226])
+            , ("draft", SGR [38,5,63])
+            , ("spam", SGR [38,5,202])
+            ]
+        }
+      , tagSymbols =
+          [ ("flagged", "*")
+          , ("attachment", "📎")
+          ]
       }
 
 myKeymap :: String -> State -> IO State
-myKeymap "a" = toggleTagAtCursor "inbox"
-myKeymap "s" = toggleTagAtCursor "unread"
-myKeymap "&" = toggleTagAtCursor "killed"
-myKeymap "*" = toggleTagAtCursor "star"
+myKeymap "h" = closeFold
+myKeymap "l" = openFold
+myKeymap "\n" = toggleFold
+
+myKeymap "g" = moveCursorUp 150
+myKeymap "G" = moveCursorDown 150
 myKeymap "k" = moveCursorUp 1
 myKeymap "j" = moveCursorDown 1
+myKeymap "\ESC[A" = moveCursorDown 1
+myKeymap "\ESC[B" = moveCursorUp 1
+myKeymap "\ESC[C" = moveTreeLeft 10  -- left
+myKeymap "\ESC[D" = moveTreeRight 10 -- right
+
+myKeymap "q" = \q -> q <$ raiseSignal sigINT
+
+myKeymap "*" = toggleTagAtCursor "flagged"
+myKeymap "a" = toggleTagAtCursor "inbox" -- mnemonic: Archive
+myKeymap "s" = toggleTagAtCursor "unread" -- mnemonic: Seen
+myKeymap "d" = toggleTagAtCursor "deleted"
+myKeymap "!" = toggleTagAtCursor "spam"
+
+myKeymap "N" = moveCursorUpToPrevUnread
+myKeymap "n" = moveCursorDownToNextUnread
+
 myKeymap "K" = moveTreeDown 1
 myKeymap "J" = moveTreeUp 1
-myKeymap "\ESC[A" = moveCursorUp 1
-myKeymap "\ESC[B" = moveCursorDown 1
 myKeymap "\ESC[a" = moveTreeDown 1
 myKeymap "\ESC[b" = moveTreeUp 1
-myKeymap "\ESC[c" = moveTreeLeft 1  -- S-Right
-myKeymap "\ESC[d" = moveTreeRight 1 -- S-Left
 myKeymap "\ESC[5~" = \q -> moveTreeDown (screenHeight q `div` 2) q  -- PgUp
 myKeymap "\ESC[6~" = \q -> moveTreeUp (screenHeight q `div` 2) q    -- PgDn
-myKeymap "\n" = toggleFold
 myKeymap "\ESC[Z" = moveCursorUpToPrevUnread -- S-Tab
-myKeymap "\t" = moveCursorDownToNextUnread
 myKeymap "\DEL" = moveToParent  -- backspace
 myKeymap "=" = \q@State{..} ->
     let cursor' = case Z.label cursor of
@@ -69,8 +104,7 @@ myKeymap "=" = \q@State{..} ->
     insert a =
         Z.prevSpace . Z.insert (Tree.Node a [])
 
-    hy s =
-        breakStringLn bf s
+    hy = breakStringLn bf
       where
         shy = '\173'
         hyp = Just german_1996
@@ -85,7 +119,7 @@ myKeymap "\ESC[12~" = \q@State{..} ->
     return q { flashMessage =
                   Plain $
                   show $
-                  maybe Nothing (Just . Notmuch.messageFilename) $
+                  fmap Notmuch.messageFilename $
                   getMessage $
                   Z.label cursor
               }
@@ -99,7 +133,7 @@ myKeymap s = displayKey s
 
 myMousemap :: Scan -> State -> IO State
 myMousemap ScanMouse{mouseButton=1,mouseY=y} = defaultMouse1Click y
-myMousemap ScanMouse{mouseButton=3,mouseY=y} = \q -> defaultMouse1Click y q >>= toggleFold
+myMousemap ScanMouse{mouseButton=3,mouseY=y} = defaultMouse1Click y >=> toggleFold
 myMousemap ScanMouse{mouseButton=4} = moveTreeDown 3
 myMousemap ScanMouse{mouseButton=5} = moveTreeUp 3
 myMousemap ScanMouse{mouseButton=0} = return
