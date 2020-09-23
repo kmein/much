@@ -22,5 +22,21 @@ data State = State
     , signalHandlers :: [(Signal, IO ())]
     , keymap :: String -> State -> IO State
     , mousemap :: Scan -> State -> IO State
-    , tagVisuals :: [(T.Text, Blessings String -> Blessings String)]
+    , tagSymbols :: [(T.Text, T.Text)]
+    , colorConfig :: ColorConfig
+    }
+
+data ColorConfig = ColorConfig
+    { alt :: Blessings String -> Blessings String
+    , search :: Blessings String -> Blessings String
+    , focus :: Blessings String -> Blessings String
+    , quote :: Blessings String -> Blessings String
+    , boring :: Blessings String -> Blessings String
+    , prefix :: Blessings String -> Blessings String
+    , date :: Blessings String -> Blessings String
+    , tags :: Blessings String -> Blessings String
+    , unreadSearch :: Blessings String -> Blessings String
+    , unreadMessage :: Blessings String -> Blessings String
+    , boringMessage :: Blessings String -> Blessings String
+    , tagMap :: [(T.Text, Blessings String -> Blessings String)]
     }

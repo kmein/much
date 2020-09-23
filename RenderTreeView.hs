@@ -14,6 +14,7 @@ import qualified Data.Tree.Zipper as Z
 import qualified TreeZipperUtils as Z
 import Blessings
 import Data.Char
+import Data.Maybe
 import Data.Time
 import Data.Time.Format.Human
 import Data.Tree
@@ -58,7 +59,7 @@ renderTreeView q@State{..} =
         maybeRenderSubForest (Z.firstChild loc)
 
     renderRootLabel loc =
-        renderPrefix loc <>
+        renderPrefix q loc <>
         renderTreeView1 q (isFocus loc) (Z.label loc)
 
     renderSubForest loc =
@@ -69,108 +70,82 @@ renderTreeView q@State{..} =
         maybe mempty renderSubForest
 
 
-renderPrefix :: Z.TreePos Z.Full TreeView -> Blessings String
-renderPrefix =
+renderPrefix :: State -> Z.TreePos Z.Full TreeView -> Blessings String
+renderPrefix state =
     mconcat . reverse . zipWith (curry prefix) [(1 :: Int)..] . Z.path
   where
     prefix (i, (_lhs, x, rhs)) = case x of
         TVSearch _ -> ""
-        TVSearchResult _ -> spacePrefix
+        TVSearchResult _ -> spacePrefix state
         TVMessage _ ->
             case i of
                 1 ->
                     if null rhs
-                        then endPrefix
-                        else teePrefix
+                        then endPrefix state
+                        else teePrefix state
                 _ ->
                     if null rhs
-                        then spacePrefix
-                        else pipePrefix
+                        then spacePrefix state
+                        else pipePrefix state
         _ ->
             if not $ any (isTVMessage . rootLabel) rhs
-                then spacePrefix
-                else pipePrefix
+                then spacePrefix state
+                else pipePrefix state
 
 
 spacePrefix
     , teePrefix
     , pipePrefix
     , endPrefix
-    :: Blessings String
-spacePrefix = prefixSGR "  "
-teePrefix   = prefixSGR "├╴"
-pipePrefix  = prefixSGR "│ "
-endPrefix   = prefixSGR "└╴"
+    :: State -> Blessings String
+spacePrefix q = prefix (colorConfig q) "  "
+teePrefix q = prefix (colorConfig q) "├╴"
+pipePrefix q = prefix (colorConfig q) "│ "
+endPrefix q = prefix (colorConfig q) "└╴"
 
 
 -- TODO locale-style: headerKey = \s -> SGR [..] (s <> ": ")
-
-searchSGR
-    , altSGR
-    , focusSGR
-    , quoteSGR
-    , boringSGR
-    , prefixSGR
-    , dateSGR
-    , tagsSGR
-    , boringMessageSGR
-    , unreadMessageSGR
-    , unreadSearchSGR
-    :: Blessings String -> Blessings String
-
-altSGR = SGR [38,5,182]
-searchSGR = SGR [38,5,162]
-focusSGR = SGR [38,5,160]
-quoteSGR = SGR [38,5,242]
-boringSGR = SGR [38,5,240]
-prefixSGR = SGR [38,5,235]
-dateSGR = SGR [38,5,071]
-tagsSGR = SGR [38,5,036]
-
-boringMessageSGR = SGR [38,5,023]
-unreadMessageSGR = SGR [38,5,117]
-unreadSearchSGR = SGR [38,5,250]
 
 
 renderTreeView1 :: State -> Bool -> TreeView -> Blessings String
 renderTreeView1 q@State{..} hasFocus x = case x of
 
     TVSearch s ->
-        let c = if hasFocus then focusSGR else searchSGR
+        let c = if hasFocus then focus colorConfig else search colorConfig
         in c $ Plain s
 
     TVSearchResult sr ->
         let c
-                | hasFocus = focusSGR
-                | isUnread = unreadSearchSGR
-                | otherwise = boringSGR
+                | hasFocus = focus colorConfig
+                | isUnread = unreadSearch colorConfig
+                | otherwise = boring colorConfig
             c_authors
-                | hasFocus = focusSGR
-                | isUnread = altSGR
-                | otherwise = boringSGR
+                | hasFocus = focus colorConfig
+                | isUnread = alt colorConfig
+                | otherwise = boring colorConfig
 
             isUnread = "unread" `elem` Notmuch.searchTags sr
 
             authors = Plain $ T.unpack $ Notmuch.searchAuthors sr
-            date = dateSGR $ renderDate now x
+            date = State.date colorConfig $ renderDate now x
             subject = Plain $ T.unpack $ Notmuch.searchSubject sr
-            tags = tagsSGR $ renderTags q (Notmuch.searchTags sr)
+            tags = State.tags colorConfig $ renderTags q (Notmuch.searchTags sr)
             title = if subject /= "" then subject else c_authors authors
         in
           c $ title <> " " <> date <> " " <> tags
 
     TVMessage m ->
         let fromSGR
-                | hasFocus = focusSGR
-                | "unread" `elem` Notmuch.messageTags m = unreadMessageSGR
-                | otherwise = boringMessageSGR
+                | hasFocus = focus colorConfig
+                | "unread" `elem` Notmuch.messageTags m = unreadMessage colorConfig
+                | otherwise = boringMessage colorConfig
             from = fromSGR $ renderFrom (M.lookup "from" $ Notmuch.messageHeaders m)
-            date = dateSGR $ renderDate now x
-            tags = tagsSGR $ renderTags q (Notmuch.messageTags m) -- TODO filter common tags
+            date = State.date colorConfig $ renderDate now x
+            tags = State.tags colorConfig $ renderTags q (Notmuch.messageTags m) -- TODO filter common tags
         in from <> " " <> date <> " " <> tags
 
     TVMessageHeaderField m fieldName ->
-        let c = if hasFocus then focusSGR else boringSGR
+        let c = if hasFocus then focus colorConfig else boring colorConfig
             k = Plain $ T.unpack $ CI.original fieldName
             v = maybe "nothing"
                       (Plain . T.unpack)
@@ -178,7 +153,7 @@ renderTreeView1 q@State{..} hasFocus x = case x of
         in c $ k <> ": " <> v
 
     TVMessagePart _ p ->
-        let c = if hasFocus then focusSGR else boringSGR
+        let c = if hasFocus then focus colorConfig else boring colorConfig
             i = Plain $ show $ Notmuch.partID p
             t = Plain $ T.unpack $ CI.original $ Notmuch.partContentType p
             filename = maybe "" (Plain . (" "<>) . show) $ Notmuch.partContentFilename p
@@ -188,12 +163,12 @@ renderTreeView1 q@State{..} hasFocus x = case x of
 
     TVMessageQuoteLine _ _ _ s ->
         if hasFocus
-            then focusSGR $ Plain s
-            else quoteSGR $ Plain s
+            then focus colorConfig $ Plain s
+            else quote colorConfig $ Plain s
 
     TVMessageLine _ _ _ s ->
         if hasFocus
-            then focusSGR $ Plain s
+            then focus colorConfig $ Plain s
             else Plain s
 
 
@@ -221,11 +196,11 @@ renderTags state =
 
 
 renderTag :: State -> Tag -> Blessings String
-renderTag state tag = case lookup tag (tagVisuals state) of
+renderTag state tag = case lookup tag (tagMap (colorConfig state)) of
     Just visual -> visual plain
     Nothing -> plain
   where
-    plain = Plain $ T.unpack tag
+    plain = Plain $ T.unpack $ fromMaybe tag $ lookup tag (tagSymbols state)
 
 
 dropAddress :: String -> String

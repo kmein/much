@@ -42,11 +42,25 @@ emptyState = State
     , signalHandlers = []
     , keymap = displayKey
     , mousemap = displayMouse
-    , tagVisuals =
-        [ ("killed", SGR [38,5,088])
-        , ("star", SGR [38,5,226])
-        , ("draft", SGR [38,5,202])
-        ]
+    , colorConfig = ColorConfig
+        { tagMap =
+            [ ("killed", SGR [38,5,088])
+            , ("star", SGR [38,5,226])
+            , ("draft", SGR [38,5,202])
+            ]
+        , alt = SGR [38,5,182]
+        , search = SGR [38,5,162]
+        , focus = SGR [38,5,160]
+        , quote = SGR [38,5,242]
+        , boring = SGR [38,5,240]
+        , prefix = SGR [38,5,235]
+        , date = SGR [38,5,071]
+        , tags = SGR [38,5,036]
+        , boringMessage = SGR [38,5,023]
+        , unreadMessage = SGR [38,5,117]
+        , unreadSearch = SGR [38,5,250]
+        }
+    , tagSymbols = []
     }
 
 withQuery :: String -> State -> IO State
