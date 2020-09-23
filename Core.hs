@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 module Core where
@@ -40,6 +41,7 @@ emptyState = State
     , treeBuffer = []
     , now = UTCTime (fromGregorian 1984 5 23) 49062
     , signalHandlers = []
+    , query = "tag:inbox AND NOT tag:killed"
     , keymap = displayKey
     , mousemap = displayMouse
     , colorConfig = ColorConfig
@@ -63,8 +65,8 @@ emptyState = State
     , tagSymbols = []
     }
 
-withQuery :: String -> State -> IO State
-withQuery query q = do
+notmuchSearch :: State -> IO State
+notmuchSearch q@State{query} = do
   r_ <- either error id <$> Notmuch.search
                                 [ "--offset=0"
                                 , "--limit=100"
@@ -77,11 +79,11 @@ mainWithState :: State -> IO ()
 mainWithState state = mainWithStateAndArgs state =<< getArgs
 
 mainWithStateAndArgs :: State -> [String] -> IO ()
-mainWithStateAndArgs state args = do
+mainWithStateAndArgs state@State{query = defaultSearch} args = do
     usage' <- parseUsageOrExit usage
     args' <- parseArgsOrExit usage' args
     let query = getArgWithDefault args' defaultSearch (shortOption 'q')
-    withScreen s0 (\_-> withQuery query state >>= runState)
+    withScreen s0 (\_-> notmuchSearch state { query = query } >>= runState)
   where
     usage = unlines
       [ "Command-line MUA using notmuch."

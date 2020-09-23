@@ -20,6 +20,7 @@ data State = State
     , treeBuffer :: [Blessings String]
     , now :: UTCTime
     , signalHandlers :: [(Signal, IO ())]
+    , query :: String
     , keymap :: String -> State -> IO State
     , mousemap :: Scan -> State -> IO State
     , tagSymbols :: [(T.Text, T.Text)]
