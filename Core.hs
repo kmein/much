@@ -93,9 +93,8 @@ mainWithStateAndArgs state@State{query = defaultSearch} args = do
       , ""
       , "Options:"
       , "  -q <search-term>, --query=<search-term>"
-      , "        Open specific search, defaults to " ++ (show defaultSearch)
+      , "        Open specific search, defaults to " ++ show defaultSearch
       ]
-    defaultSearch = "tag:inbox AND NOT tag:killed"
 
     s0 = Screen False NoBuffering (BlockBuffering $ Just 4096)
             [ 1000 -- X & Y on button press and release
@@ -144,7 +143,7 @@ uninstallHandlers =
 winchHandler :: (Event -> IO ()) -> IO ()
 winchHandler putEvent =
     Term.size >>= \case
-        Just (Term.Window {Term.width = w, Term.height = h}) ->
+        Just Term.Window {Term.width = w, Term.height = h} ->
             putEvent $ EResize w h
         Nothing ->
             return ()

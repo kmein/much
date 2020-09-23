@@ -1,7 +1,6 @@
 module State where
 
 import Blessings.String (Blessings)
-import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Time
 import qualified Data.Tree.Zipper as Z
