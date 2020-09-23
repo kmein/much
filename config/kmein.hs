@@ -74,6 +74,8 @@ myKeymap "\ESC[B" = moveCursorUp 1
 myKeymap "\ESC[C" = moveTreeLeft 10  -- left
 myKeymap "\ESC[D" = moveTreeRight 10 -- right
 
+myKeymap "r" = notmuchSearch
+
 myKeymap "q" = \q -> q <$ raiseSignal sigINT
 
 myKeymap "*" = toggleTagAtCursor "flagged"
