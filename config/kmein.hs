@@ -34,7 +34,18 @@ main =
       { keymap = myKeymap
       , mousemap = myMousemap
       , colorConfig = (colorConfig emptyState)
-        { tagMap =
+        { boring = SGR [38,5,8]
+        , alt = SGR [38,5,182]
+        , search = SGR [38,5,13]
+        , focus = SGR [38,5,4]
+        , quote = SGR [38,5,7]
+        , prefix = SGR [38,5,235]
+        , date = SGR [38,5,1]
+        , tags = SGR [38,5,14]
+        , boringMessage = SGR [38,5,3]
+        , unreadMessage = SGR [38,5,11]
+        , unreadSearch = SGR [38,5,15]
+        , tagMap =
             [ ("deleted", SGR [38,5,088])
             , ("flagged", SGR [38,5,226])
             , ("draft", SGR [38,5,63])
@@ -42,15 +53,17 @@ main =
             ]
         }
       , tagSymbols =
-          [ ("flagged", "*")
+          [ ("flagged", "🔖")
           , ("attachment", "📎")
+          , ("signed", "🔒")
           ]
+      , query = "tag:inbox"
       }
 
 myKeymap :: String -> State -> IO State
 myKeymap "h" = closeFold
 myKeymap "l" = openFold
-myKeymap "\n" = toggleFold
+myKeymap " " = toggleFold
 
 myKeymap "g" = moveCursorUp 150
 myKeymap "G" = moveCursorDown 150
