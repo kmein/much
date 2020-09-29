@@ -196,11 +196,11 @@ renderTags state =
 
 
 renderTag :: State -> Tag -> Blessings String
-renderTag state tag = case lookup tag (tagMap (colorConfig state)) of
+renderTag state tag = case M.lookup tag (tagMap (colorConfig state)) of
     Just visual -> visual plain
     Nothing -> plain
   where
-    plain = Plain $ T.unpack $ fromMaybe tag $ lookup tag (tagSymbols state)
+    plain = Plain $ T.unpack $ fromMaybe tag $ M.lookup tag (tagSymbols state)
 
 
 dropAddress :: String -> String

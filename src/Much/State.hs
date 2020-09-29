@@ -1,13 +1,17 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Much.State where
 
 import Blessings.String (Blessings)
-import qualified Data.Text as T
+import Data.Aeson
 import Data.Time
-import qualified Data.Tree.Zipper as Z
+import GHC.Generics
+import Much.TreeView (TreeView)
 import Scanner
 import System.Posix.Signals
-import Much.TreeView (TreeView)
+import qualified Data.Text as T
+import qualified Data.Map as M
+import qualified Data.Tree.Zipper as Z
 
 data State = State
     { cursor :: Z.TreePos Z.Full TreeView
@@ -23,24 +27,26 @@ data State = State
     , query :: String
     , keymap :: String -> State -> IO State
     , mousemap :: Scan -> State -> IO State
-    , tagSymbols :: [(T.Text, T.Text)]
-    , colorConfig :: ColorConfig
-    }
-
-data ColorConfig = ColorConfig
-    { alt :: Blessings String -> Blessings String
-    , search :: Blessings String -> Blessings String
-    , focus :: Blessings String -> Blessings String
-    , quote :: Blessings String -> Blessings String
-    , boring :: Blessings String -> Blessings String
-    , prefix :: Blessings String -> Blessings String
-    , date :: Blessings String -> Blessings String
-    , tags :: Blessings String -> Blessings String
-    , unreadSearch :: Blessings String -> Blessings String
-    , unreadMessage :: Blessings String -> Blessings String
-    , boringMessage :: Blessings String -> Blessings String
-    , tagMap :: [(T.Text, Blessings String -> Blessings String)]
+    , tagSymbols :: M.Map T.Text T.Text
+    , colorConfig :: ColorConfig (Blessings String -> Blessings String)
     }
 
 instance Show (State -> IO ()) where
     show = const "λ"
+
+data ColorConfig a = ColorConfig
+    { alt :: a
+    , search :: a
+    , focus :: a
+    , quote :: a
+    , boring :: a
+    , prefix :: a
+    , date :: a
+    , tags :: a
+    , unreadSearch :: a
+    , unreadMessage :: a
+    , boringMessage :: a
+    , tagMap :: M.Map T.Text a
+    } deriving (Generic, Show)
+
+instance FromJSON a => FromJSON (ColorConfig a)

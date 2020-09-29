@@ -49,6 +49,7 @@ library
   hs-source-dirs:  src
   exposed-modules: Much.Core
                  , Much.Action
+                 , Much.Config
                  , Much.Event
                  , Much.ParseMail
                  , Much.RenderTreeView
@@ -91,6 +92,7 @@ library
                  , linebreak
                  , network
                  , old-locale
+                 , optparse-applicative
                  , process
                  , random
                  , rosezipper

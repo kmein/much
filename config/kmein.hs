@@ -17,6 +17,7 @@ import System.Posix.Signals
 import Text.Hyphenation
 import Text.LineBreak
 import qualified Data.Tree as Tree
+import qualified Data.Map as M
 import qualified Data.Tree.Zipper as Z
 
 {- notmuch's special tags are:
@@ -45,14 +46,14 @@ main =
         , boringMessage = SGR [38,5,3]
         , unreadMessage = SGR [38,5,11]
         , unreadSearch = SGR [38,5,15]
-        , tagMap =
+        , tagMap = M.fromList
             [ ("deleted", SGR [38,5,088])
             , ("flagged", SGR [38,5,226])
             , ("draft", SGR [38,5,63])
             , ("spam", SGR [38,5,202])
             ]
         }
-      , tagSymbols =
+      , tagSymbols = M.fromList
           [ ("flagged", "🔖")
           , ("attachment", "📎")
           , ("signed", "🔒")

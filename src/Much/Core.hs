@@ -4,28 +4,34 @@
 {-# LANGUAGE RecordWildCards #-}
 module Much.Core where
 
-import Much.Action
-import Much.API
 import Blessings.String (Blessings(Plain,SGR),pp)
 import Control.Concurrent
 import Control.Monad
+import Data.Aeson
 import Data.Functor
+import Data.Maybe
 import Data.Time
+import Debug.Trace
+import Much.API
+import Much.Action
 import Much.Event
 import Much.RenderTreeView (renderTreeView)
-import Scanner (scan,Scan(..))
 import Much.Screen
 import Much.State
-import System.Console.Docopt.NoTH (getArgWithDefault, parseArgsOrExit, parseUsageOrExit, shortOption)
-import System.Environment
-import System.IO
-import System.Posix.Signals
 import Much.TreeSearch
 import Much.TreeView
 import Much.Utils
+import Options.Applicative
+import Scanner (scan,Scan(..))
+import System.Environment
+import System.Exit
+import System.IO
+import System.Posix.Signals
 import qualified Blessings.Internal as Blessings
+import qualified Data.Map as M
 import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
+import qualified Much.Config as Config
 import qualified Notmuch
 import qualified System.Console.Terminal.Size as Term
 
@@ -47,7 +53,7 @@ emptyState = State
     , keymap = displayKey
     , mousemap = displayMouse
     , colorConfig = ColorConfig
-        { tagMap =
+        { tagMap = M.fromList
             [ ("killed", SGR [38,5,088])
             , ("star", SGR [38,5,226])
             , ("draft", SGR [38,5,202])
@@ -64,8 +70,40 @@ emptyState = State
         , unreadMessage = SGR [38,5,117]
         , unreadSearch = SGR [38,5,250]
         }
-    , tagSymbols = []
+    , tagSymbols = M.empty
     }
+
+
+importConfig :: Config.Config -> State -> State
+importConfig config state = state
+  { tagSymbols = fromMaybe (tagSymbols state) (Config.tagSymbols config)
+  , query = fromMaybe (query state) (Config.query config)
+  , colorConfig =
+    let fromColorConfig key1 key2 = case Config.colorConfig config of
+                                      Just colorC -> maybe (key1 (colorConfig state)) SGR (key2 colorC)
+                                      Nothing -> key1 (colorConfig state)
+    in ColorConfig
+      { tagMap =
+        case tagMap <$> Config.colorConfig config of
+          Just tagMap' ->
+            M.foldlWithKey
+              (\previous k v -> maybe previous (\code -> M.insert k (SGR code) previous) v)
+              (tagMap (colorConfig state))
+              tagMap'
+          Nothing -> tagMap (colorConfig state)
+      , alt = fromColorConfig alt alt
+      , search = fromColorConfig search search
+      , focus = fromColorConfig focus focus
+      , quote = fromColorConfig quote quote
+      , boring = fromColorConfig boring boring
+      , prefix = fromColorConfig prefix prefix
+      , date = fromColorConfig date date
+      , tags = fromColorConfig tags tags
+      , boringMessage = fromColorConfig boringMessage boringMessage
+      , unreadSearch = fromColorConfig unreadSearch unreadSearch
+      , unreadMessage = fromColorConfig unreadMessage unreadMessage
+      }
+  }
 
 notmuchSearch :: State -> IO State
 notmuchSearch q@State{query} = do
@@ -77,26 +115,31 @@ notmuchSearch q@State{query} = do
 
   return q { cursor = Z.fromTree $ fromSearchResults query r_ }
 
+
 mainWithState :: State -> IO ()
 mainWithState state = mainWithStateAndArgs state =<< getArgs
 
 mainWithStateAndArgs :: State -> [String] -> IO ()
 mainWithStateAndArgs state@State{query = defaultSearch} args = do
-    usage' <- parseUsageOrExit usage
-    args' <- parseArgsOrExit usage' args
-    let query = getArgWithDefault args' defaultSearch (shortOption 'q')
-    withScreen s0 (\_-> notmuchSearch state { query = query } >>= runState)
+    (query, maybeConfigPath) <- execParser (options defaultSearch)
+    newState <- case maybeConfigPath of
+      Just configPath -> do
+        eitherConfig <- eitherDecodeFileStrict configPath
+        case eitherConfig of
+          Left err -> do
+            hPutStrLn stderr err
+            exitFailure
+          Right config -> return $ importConfig config state
+      Nothing -> return state
+    withScreen s0 (\_-> notmuchSearch newState { query = query } >>= runState)
   where
-    usage = unlines
-      [ "Command-line MUA using notmuch."
-      , ""
-      , "Usage:"
-      , "  much [-q <search-term>]"
-      , ""
-      , "Options:"
-      , "  -q <search-term>, --query=<search-term>"
-      , "        Open specific search, defaults to " ++ show defaultSearch
-      ]
+    options defaultQuery =
+      info (muchArgs <**> helper) (fullDesc <> progDesc "Command-line MUA using notmuch.")
+        where
+          muchArgs =
+            (,)
+            <$> strOption (long "query" <> short 'q' <> metavar "QUERY" <> help "Open specific search" <> value defaultQuery <> showDefault)
+            <*> optional (strOption (long "config" <> short 'c' <> metavar "PATH" <> help "Import settings from a JSON config"))
 
     s0 = Screen False NoBuffering (BlockBuffering $ Just 4096)
             [ 1000 -- X & Y on button press and release
