@@ -70,6 +70,7 @@ emptyState = State
         , unreadSearch = SGR [38,5,250]
         }
     , tagSymbols = M.empty
+    , apiConfig = Much.API.emptyConfig
     }
 
 
@@ -164,7 +165,7 @@ runState q0 = do
 
     threadIds <- mapM forkIO
         [ forever $ scan stdin >>= putEvent . EScan
-        , Much.API.main putEvent
+        , Much.API.main (apiConfig q1) putEvent
         ]
 
     winchHandler putEvent

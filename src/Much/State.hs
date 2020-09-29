@@ -9,9 +9,10 @@ import GHC.Generics
 import Much.TreeView (TreeView)
 import Scanner
 import System.Posix.Signals
-import qualified Data.Text as T
 import qualified Data.Map as M
+import qualified Data.Text as T
 import qualified Data.Tree.Zipper as Z
+import qualified Much.API.Config
 
 data State = State
     { cursor :: Z.TreePos Z.Full TreeView
@@ -29,6 +30,7 @@ data State = State
     , mousemap :: Scan -> State -> IO State
     , tagSymbols :: M.Map T.Text T.Text
     , colorConfig :: ColorConfig (Blessings String -> Blessings String)
+    , apiConfig :: Much.API.Config.Config
     }
 
 instance Show (State -> IO ()) where

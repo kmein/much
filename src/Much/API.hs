@@ -1,15 +1,17 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Much.API where
+module Much.API (module Much.API) where
 
 import Control.Concurrent
 import Control.Exception (catch, finally, throwIO)
 import Control.Monad.IO.Class
 import Data.Function ((&))
 import Data.Proxy (Proxy)
+import Much.API.Config as Much.API
 import Much.Event
 import Much.State
 import Much.TreeView
@@ -34,12 +36,11 @@ type API =
 api :: Proxy API
 api = Proxy
 
-main :: (Event -> IO ()) -> IO ()
-main putEvent = do
+main :: Config -> (Event -> IO ()) -> IO ()
+main Config{socketPath} putEvent = do
     sock <- socket AF_UNIX Stream defaultProtocol
-    let sockFile = "/home/tv/tmp/much/warp.sock" -- PID?
-    removeIfExists sockFile
-    bind sock $ SockAddrUnix sockFile
+    removeIfExists socketPath
+    bind sock $ SockAddrUnix socketPath
     listen sock maxListenQueue
     let settings = defaultSettings
           & setPort 0

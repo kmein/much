@@ -50,6 +50,7 @@ library
   exposed-modules: Much.Core
                  , Much.Action
                  , Much.API
+                 , Much.API.Config
                  , Much.Config
                  , Much.Event
                  , Much.ParseMail
