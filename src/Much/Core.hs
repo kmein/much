@@ -11,7 +11,6 @@ import Data.Aeson
 import Data.Functor
 import Data.Maybe
 import Data.Time
-import Debug.Trace
 import Much.API
 import Much.Action
 import Much.Event
@@ -117,10 +116,7 @@ notmuchSearch q@State{query} = do
 
 
 mainWithState :: State -> IO ()
-mainWithState state = mainWithStateAndArgs state =<< getArgs
-
-mainWithStateAndArgs :: State -> [String] -> IO ()
-mainWithStateAndArgs state@State{query = defaultSearch} args = do
+mainWithState state@State{query = defaultSearch} = do
     (query, maybeConfigPath) <- execParser (options defaultSearch)
     newState <- case maybeConfigPath of
       Just configPath -> do
@@ -210,8 +206,8 @@ processEvent q = \case
         return $ Right q { flashMessage = t }
     EScan (ScanKey s) ->
         Right <$> keymap q s q
-    EScan info@ScanMouse{..} ->
-        Right <$> mousemap q info q
+    EScan mouseInfo@ScanMouse{..} ->
+        Right <$> mousemap q mouseInfo q
     EShutdown ->
         return $ Left q
     EResize w h ->

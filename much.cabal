@@ -49,6 +49,7 @@ library
   hs-source-dirs:  src
   exposed-modules: Much.Core
                  , Much.Action
+                 , Much.API
                  , Much.Config
                  , Much.Event
                  , Much.ParseMail
@@ -98,7 +99,7 @@ library
                  , rosezipper
                  , safe
                  , scanner
-                 , servent-server
+                 , servant-server
                  , split
                  , terminal-size
                  , text
