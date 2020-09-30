@@ -85,13 +85,13 @@ saveAttachment q
           destination
             | Just partFileName <- Notmuch.partContentFilename part = attachmentDestination </> T.unpack partFileName
             | otherwise = concat ["much_", formatTime defaultTimeLocale "%s" (Notmuch.messageTime message), "_", show (Notmuch.partID part)]
-          q' = q { flashMessage = SGR [1] (Plain destination) <> Plain " saved." }
+          q' = q { flashMessage = SGR [1] (Plain destination) <> Plain " saved" }
          in case Notmuch.partContent part' of
               Notmuch.ContentText text -> (Just destination, q') <$ T.writeFile destination text
               Notmuch.ContentRaw raw _ -> (Just destination, q') <$ LBS8.writeFile destination raw
-              _ -> return (Nothing, q { flashMessage = SGR [38,5,9] $ Plain "This part cannot be saved." })
-      Left err -> return (Nothing, q { flashMessage = SGR [38,5,9] $ Plain err })
-  | otherwise = return (Nothing, q { flashMessage = SGR [38,5,9] $ Plain "Cursor not on attachment." })
+              _ -> return (Nothing, q { flashMessage = "this part cannot be saved" })
+      Left err -> return (Nothing, q { flashMessage = Plain err })
+  | otherwise = return (Nothing, q { flashMessage = "cursor not on attachment" })
 
 
 reply :: State -> IO State
