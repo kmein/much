@@ -26,6 +26,7 @@ import Text.Hyphenation
 import Text.LineBreak
 import qualified Data.Map as M
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
 
@@ -77,27 +78,24 @@ main =
 saveAttachment :: State -> IO (Maybe FilePath, State)
 saveAttachment q
   | TVMessagePart message part <- Z.label (cursor q) = do
-    let query = Notmuch.unMessageID $ Notmuch.messageId message
-        defaultFilename = "much_part_" <> show (Notmuch.partID part) <> "_" <> formatTime defaultTimeLocale "%s" (Notmuch.messageTime message)
-        destination =
-          attachmentDestination </>
-            maybe defaultFilename T.unpack (Notmuch.partContentFilename part)
-    Notmuch.notmuchShowPartRaw query (Notmuch.partID part) >>= \case
-      Right byteString -> do
-        LBS8.writeFile destination byteString
-        return
-          ( Just destination
-          , q { flashMessage = Plain "Attachment saved to " <> SGR [1] (Plain destination) <> Plain "." }
-          )
-      Left err -> return
-        ( Nothing
-        , q { flashMessage = SGR [38,5,9] $ Plain err }
-        )
+    let messageId = Notmuch.unMessageID (Notmuch.messageId message)
+    Notmuch.notmuchShowPart messageId (Notmuch.partID part) >>= \case
+      Right part' ->
+        let
+          destination
+            | Just partFileName <- Notmuch.partContentFilename part = attachmentDestination </> T.unpack partFileName
+            | otherwise = concat ["much_", formatTime defaultTimeLocale "%s" (Notmuch.messageTime message), "_", show (Notmuch.partID part)]
+          q' = q { flashMessage = SGR [1] (Plain destination) <> Plain " saved." }
+         in case Notmuch.partContent part' of
+              Notmuch.ContentText text -> (Just destination, q') <$ T.writeFile destination text
+              Notmuch.ContentRaw raw _ -> (Just destination, q') <$ LBS8.writeFile destination raw
+              _ -> return (Nothing, q { flashMessage = SGR [38,5,9] $ Plain "This part cannot be saved." })
+      Left err -> return (Nothing, q { flashMessage = SGR [38,5,9] $ Plain err })
   | otherwise = return (Nothing, q { flashMessage = SGR [38,5,9] $ Plain "Cursor not on attachment." })
 
 
 reply :: State -> IO State
-reply q = q <$ runCommand "i3-sensible-terminal -e $EDITOR -c 'read !mail-reply'"
+reply q = q <$ spawnCommand "i3-sensible-terminal -e $EDITOR -c 'read !mail-reply'"
 
 myKeymap :: String -> State -> IO State
 myKeymap "h" = closeFold
