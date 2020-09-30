@@ -13,7 +13,9 @@ import qualified Data.Text as T
 import qualified Data.Tree.Zipper as Z
 import qualified Much.TreeZipperUtils as Z
 import Blessings
+import Control.Arrow
 import Data.Char
+import Data.Function
 import Data.Maybe
 import Data.Time
 import Data.Time.Format.Human
@@ -165,6 +167,28 @@ renderTreeView1 q@State{..} hasFocus x = case x of
         if hasFocus
             then focus colorConfig $ Plain s
             else quote colorConfig $ Plain s
+
+    TVMessageRawLine _ _ _ s ->
+        mconcat . map (uncurry renderClassifiedString) $ classifiedGroupBy isPrint s
+      where
+        renderClassifiedString :: Bool -> String -> Blessings String
+        renderClassifiedString = \case
+            True -> printableColor . Plain
+            False -> unprintableColor . Plain . showLitChar'
+
+        (printableColor, unprintableColor) =
+            if hasFocus
+              then (focus colorConfig, unprintableFocus colorConfig)
+              else (quote colorConfig, unprintableNormal colorConfig)
+
+        showLitChar' :: String -> String
+        showLitChar' = (>>= f)
+          where f '\ESC' = "^["
+                f c = showLitChar c ""
+
+        classifiedGroupBy :: Eq b => (a -> b) -> [a] -> [(b, [a])]
+        classifiedGroupBy f =
+            map (f . head &&& id) . L.groupBy ((==) `on` f)
 
     TVMessageLine _ _ _ s ->
         if hasFocus

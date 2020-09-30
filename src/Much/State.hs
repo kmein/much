@@ -49,6 +49,8 @@ data ColorConfig a = ColorConfig
     , unreadMessage :: a
     , boringMessage :: a
     , tagMap :: M.Map T.Text a
+    , unprintableFocus :: a
+    , unprintableNormal :: a
     } deriving (Generic, Show)
 
 instance FromJSON a => FromJSON (ColorConfig a)

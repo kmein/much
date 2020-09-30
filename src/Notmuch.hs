@@ -11,6 +11,8 @@ import Control.Concurrent
 import Control.DeepSeq (rnf)
 import Control.Exception
 import Data.Aeson.Extends
+import Data.Either.Combinators (mapRight)
+import Data.Functor ((<&>))
 import Data.Tree
 import Notmuch.Class
 import Notmuch.Message
@@ -187,9 +189,21 @@ notmuchShowPart term partId = do
         notmuch' [ "show", "--format=json", "--format-version=2"
                  , "--part=" <> show partId
                  , term ]
-    return $ case exitCode of
-        ExitSuccess -> eitherDecodeLenient' out
-        _ -> Left $ show exitCode <> ": " <> LBS8.unpack err
+    case exitCode of
+        ExitSuccess ->
+          case eitherDecodeLenient' out of
+            Right mp -> do
+              case partContent mp of
+                ContentRaw "" contentLength ->
+                  notmuchShowPartRaw term partId <&> mapRight (\raw ->
+                      mp { partContent = ContentRaw raw contentLength }
+                    )
+                _ ->
+                  return $ Right mp
+            Left err2 ->
+              return $ Left err2
+        _ ->
+          return $ Left $ show exitCode <> ": " <> LBS8.unpack err
 
 
 notmuchShowMail :: String -> IO (Either String M.Mail)

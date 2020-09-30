@@ -91,6 +91,7 @@ library
                  , deepseq
                  , directory
                  , docopt
+                 , either
                  , email-header
                  , filepath
                  , friendly-time

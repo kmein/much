@@ -16,6 +16,7 @@ data TreeView
     | TVMessageHeaderField Message (CI.CI T.Text)
     | TVMessagePart Message MessagePart
     | TVMessageQuoteLine Message MessagePart LineNr String
+    | TVMessageRawLine Message MessagePart LineNr String
     | TVMessageLine Message MessagePart LineNr String
     | TVSearch String
     | TVSearchResult SearchResult
@@ -51,6 +52,9 @@ treeViewId = \case
         TVIDMessageLine (fromMessage m) (partID mp) lineNr
 
     TVMessageQuoteLine m mp lineNr _ ->
+        TVIDMessageLine (fromMessage m) (partID mp) lineNr
+
+    TVMessageRawLine m mp lineNr _ ->
         TVIDMessageLine (fromMessage m) (partID mp) lineNr
 
     TVSearch s ->

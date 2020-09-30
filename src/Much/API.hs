@@ -84,6 +84,7 @@ main Config{socketPath} putEvent = do
         TVMessageHeaderField m _    -> notmuchId m
         TVMessagePart m _           -> notmuchId m
         TVMessageQuoteLine m _ _ _  -> notmuchId m
+        TVMessageRawLine m _ _ _    -> notmuchId m
         TVMessageLine m _ _ _       -> notmuchId m
         TVSearch s                  -> s
         TVSearchResult r            -> notmuchId r

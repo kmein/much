@@ -18,6 +18,7 @@ module Much.TreeView
     ) where
 
 
+import qualified Data.ByteString.Lazy.Char8 as LBS8
 import qualified Data.Text as T
 import Data.Tree
 import Notmuch
@@ -94,6 +95,8 @@ xconvPart m p =
     contents = case partContent p of
         ContentText t ->
             zipWith (curry $ xconvLine m p) [0..] (T.lines t)
+        ContentRaw raw _ ->
+            zipWith (xconvRawLine m p) [0..] (lines . LBS8.unpack $ raw)
         ContentMultipart parts ->
             map (xconvPart m) parts
         ContentMsgRFC822 _ ->
@@ -109,6 +112,12 @@ xconvLine m p (i, s) =
         if isQuoteLine s
             then TVMessageQuoteLine
             else TVMessageLine
+
+
+xconvRawLine
+  :: Message -> MessagePart -> LineNr -> String -> Tree TreeView
+xconvRawLine m p i s =
+    Node (TVMessageRawLine m p i s) []
 
 
 isQuoteLine :: T.Text -> Bool
