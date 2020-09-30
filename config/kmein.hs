@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Main (main) where
@@ -7,17 +8,25 @@ import Much.Action
 import Much.Core
 import Much.State
 import Much.TreeView
+import qualified Notmuch
 import qualified Notmuch.Message as Notmuch
+import qualified Data.ByteString.Lazy.Char8 as LBS8
 
 import Blessings.String
 import Control.Monad
 import Data.Maybe
+import Data.Time.Format
 import Scanner
+import System.Exit
+import System.FilePath
+import System.IO
 import System.Posix.Signals
+import System.Process
 import Text.Hyphenation
 import Text.LineBreak
-import qualified Data.Tree as Tree
 import qualified Data.Map as M
+import qualified Data.Text as T
+import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
 
 {- notmuch's special tags are:
@@ -26,8 +35,11 @@ import qualified Data.Tree.Zipper as Z
   automatic: attachment signed encrypted
   cli default tags: unread inbox deleted spam
 
-ref: https://notmuchmail.org/special-tags/
+  ref: https://notmuchmail.org/special-tags/
 -}
+
+attachmentDestination :: FilePath
+attachmentDestination = "/tmp"
 
 main :: IO ()
 main =
@@ -61,6 +73,28 @@ main =
       , query = "tag:inbox"
       }
 
+
+saveAttachment :: State -> IO (Maybe FilePath, State)
+saveAttachment q
+  | TVMessagePart message part <- Z.label (cursor q) = do
+    let query = Notmuch.unMessageID $ Notmuch.messageId message
+        defaultFilename = "much_part_" <> show (Notmuch.partID part) <> "_" <> formatTime defaultTimeLocale "%s" (Notmuch.messageTime message)
+        destination =
+          attachmentDestination </>
+            maybe defaultFilename T.unpack (Notmuch.partContentFilename part)
+    Notmuch.notmuchShowPartRaw query (Notmuch.partID part) >>= \case
+      Right byteString -> do
+        LBS8.writeFile destination byteString
+        return
+          ( Just destination
+          , q { flashMessage = Plain "Attachment saved to " <> SGR [1] (Plain destination) <> Plain "." }
+          )
+      Left err -> return
+        ( Nothing
+        , q { flashMessage = SGR [38,5,9] $ Plain err }
+        )
+  | otherwise = return (Nothing, q { flashMessage = SGR [38,5,9] $ Plain "Cursor not on attachment." })
+
 myKeymap :: String -> State -> IO State
 myKeymap "h" = closeFold
 myKeymap "l" = openFold
@@ -76,6 +110,12 @@ myKeymap "\ESC[C" = moveTreeLeft 10  -- left
 myKeymap "\ESC[D" = moveTreeRight 10 -- right
 
 myKeymap "r" = notmuchSearch
+
+myKeymap "S" = fmap snd . saveAttachment
+myKeymap "o" = saveAttachment >=> \case
+  (Nothing, q') -> return q'
+  (Just filePath, q') ->
+    q' <$ runCommand ("xdg-open " <> filePath)
 
 myKeymap "q" = \q -> q <$ raiseSignal sigINT
 

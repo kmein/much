@@ -170,6 +170,16 @@ notmuchShow term = do
         either error id (eitherDecodeLenient' c')
 
 
+notmuchShowPartRaw :: String -> Int -> IO (Either String LBS8.ByteString)
+notmuchShowPartRaw term partId = do
+    (exitCode, out, err) <-
+        notmuch' [ "show", "--format=raw"
+                 , "--part=" <> show partId
+                 , term ]
+    return $ case exitCode of
+        ExitSuccess -> Right out
+        _ -> Left $ show exitCode <> ": " <> LBS8.unpack err
+
 notmuchShowPart :: String -> Int -> IO (Either String MessagePart)
 notmuchShowPart term partId = do
     -- TODO handle partId == 0 and partId > N

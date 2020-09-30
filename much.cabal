@@ -37,13 +37,18 @@ executable much-kmein
   ghc-options:      -O2 -threaded -with-rtsopts=-N
   build-depends:    much
                   , base
-                  , unix
-                  , scanner
                   , blessings
+                  , bytestring
+                  , containers
+                  , filepath
                   , hyphenation
                   , linebreak
-                  , containers
+                  , process
                   , rosezipper
+                  , scanner
+                  , text
+                  , time
+                  , unix
 
 library
   hs-source-dirs:  src
