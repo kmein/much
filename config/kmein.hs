@@ -95,6 +95,10 @@ saveAttachment q
         )
   | otherwise = return (Nothing, q { flashMessage = SGR [38,5,9] $ Plain "Cursor not on attachment." })
 
+
+reply :: State -> IO State
+reply q = q <$ runCommand "i3-sensible-terminal -e $EDITOR -c 'read !mail-reply'"
+
 myKeymap :: String -> State -> IO State
 myKeymap "h" = closeFold
 myKeymap "l" = openFold
@@ -111,6 +115,7 @@ myKeymap "\ESC[D" = moveTreeRight 10 -- right
 
 myKeymap "r" = notmuchSearch
 
+myKeymap "R" = reply
 myKeymap "S" = fmap snd . saveAttachment
 myKeymap "o" = saveAttachment >=> \case
   (Nothing, q') -> return q'
