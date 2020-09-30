@@ -118,7 +118,7 @@ myKeymap "S" = fmap snd . saveAttachment
 myKeymap "o" = saveAttachment >=> \case
   (Nothing, q') -> return q'
   (Just filePath, q') ->
-    q' <$ runCommand ("xdg-open " <> filePath)
+    q' <$ callProcess "xdg-open" [filePath]
 
 myKeymap "q" = \q -> q <$ raiseSignal sigINT
 
