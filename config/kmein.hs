@@ -4,19 +4,17 @@
 
 module Main (main) where
 
+import Blessings.String
+import Control.Monad
+import Data.Default
+import Data.Maybe
+import Data.Time.Format
 import Much.Action
 import Much.Core
 import Much.State
 import Much.TreeView
-import qualified Notmuch
-import qualified Notmuch.Message as Notmuch
-import qualified Data.ByteString.Lazy.Char8 as LBS8
-
-import Blessings.String
-import Control.Monad
-import Data.Maybe
-import Data.Time.Format
 import Scanner
+import System.Directory
 import System.Exit
 import System.FilePath
 import System.IO
@@ -24,11 +22,14 @@ import System.Posix.Signals
 import System.Process
 import Text.Hyphenation
 import Text.LineBreak
+import qualified Data.ByteString.Lazy.Char8 as LBS8
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
+import qualified Notmuch
+import qualified Notmuch.Message as Notmuch
 
 {- notmuch's special tags are:
 
@@ -39,15 +40,12 @@ import qualified Data.Tree.Zipper as Z
   ref: https://notmuchmail.org/special-tags/
 -}
 
-attachmentDestination :: FilePath
-attachmentDestination = "/tmp"
-
 main :: IO ()
 main =
-    mainWithState emptyState
+    mainWithState def
       { keymap = myKeymap
       , mousemap = myMousemap
-      , colorConfig = (colorConfig emptyState)
+      , colorConfig = def
         { boring = SGR [38,5,8]
         , alt = SGR [38,5,182]
         , search = SGR [38,5,13]
@@ -74,25 +72,49 @@ main =
       , query = "tag:inbox"
       }
 
+showCurrentMessagePart :: State -> IO (Maybe (Notmuch.Message, Notmuch.MessagePart))
+showCurrentMessagePart q =
+  case Z.label (cursor q) of
+    TVMessagePart message part -> do
+      let messageId = Notmuch.unMessageID (Notmuch.messageId message)
+      partResult <- Notmuch.notmuchShowPart messageId (Notmuch.partID part)
+      case partResult of
+        Right part' -> return $ Just (message, part')
+        Left _ -> return Nothing
+    _ -> return Nothing
 
-saveAttachment :: State -> IO (Maybe FilePath, State)
-saveAttachment q
-  | TVMessagePart message part <- Z.label (cursor q) = do
-    let messageId = Notmuch.unMessageID (Notmuch.messageId message)
-    Notmuch.notmuchShowPart messageId (Notmuch.partID part) >>= \case
-      Right part' ->
-        let
-          destination
-            | Just partFileName <- Notmuch.partContentFilename part = attachmentDestination </> T.unpack partFileName
-            | otherwise = concat ["much_", formatTime defaultTimeLocale "%s" (Notmuch.messageTime message), "_", show (Notmuch.partID part)]
-          q' = q { flashMessage = SGR [1] (Plain destination) <> Plain " saved" }
-         in case Notmuch.partContent part' of
-              Notmuch.ContentText text -> (Just destination, q') <$ T.writeFile destination text
-              Notmuch.ContentRaw raw _ -> (Just destination, q') <$ LBS8.writeFile destination raw
-              _ -> return (Nothing, q { flashMessage = "this part cannot be saved" })
-      Left err -> return (Nothing, q { flashMessage = Plain err })
-  | otherwise = return (Nothing, q { flashMessage = "cursor not on attachment" })
+currentAttachmentPath :: State -> Notmuch.Message -> Notmuch.MessagePart -> FilePath
+currentAttachmentPath q message part =
+  attachmentDirectory q </> attachmentFileName q message part
 
+saveAttachment :: State -> IO State
+saveAttachment q =
+  showCurrentMessagePart q >>= \case
+    Nothing -> return q { flashMessage = "cursor not on attachment" }
+    Just (message, part) -> do
+      let destination = currentAttachmentPath q message part
+      alreadyDownloaded <- doesFileExist destination
+      if attachmentOverwrite q || not alreadyDownloaded
+         then case Notmuch.partContent part of
+            Notmuch.ContentText text ->
+              q { flashMessage = Plain destination } <$
+                T.writeFile destination text
+            Notmuch.ContentRaw raw _ ->
+              q { flashMessage = Plain destination } <$
+                LBS8.writeFile destination raw
+            _ -> return q { flashMessage = "this part cannot be saved" }
+         else
+            return q { flashMessage = "not overwriting attachment" }
+
+openAttachment :: State -> IO State
+openAttachment q =
+  showCurrentMessagePart q >>= \case
+    Nothing -> return q { flashMessage = "cursor not on attachment" }
+    Just (message, part) -> do
+      let destination = currentAttachmentPath q message part
+      alreadyDownloaded <- doesFileExist destination
+      unless alreadyDownloaded (void $ saveAttachment q)
+      q <$ callProcess "xdg-open" [destination]
 
 reply :: State -> IO State
 reply q = q <$ spawnCommand "i3-sensible-terminal -e $EDITOR -c 'read !mail-reply'"
@@ -114,11 +136,8 @@ myKeymap "\ESC[D" = moveTreeRight 10 -- right
 myKeymap "r" = notmuchSearch
 
 myKeymap "R" = reply
-myKeymap "S" = fmap snd . saveAttachment
-myKeymap "o" = saveAttachment >=> \case
-  (Nothing, q') -> return q'
-  (Just filePath, q') ->
-    q' <$ callProcess "xdg-open" [filePath]
+myKeymap "S" = saveAttachment
+myKeymap "o" = openAttachment
 
 myKeymap "q" = \q -> q <$ raiseSignal sigINT
 

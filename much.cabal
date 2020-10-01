@@ -14,6 +14,7 @@ executable much-tv
   build-depends:    much
                   , base
                   , blessings
+                  , data-default
                   , deepseq
                   , transformers
                   , aeson
@@ -40,6 +41,8 @@ executable much-kmein
                   , blessings
                   , bytestring
                   , containers
+                  , data-default
+                  , directory
                   , filepath
                   , hyphenation
                   , linebreak
@@ -88,6 +91,7 @@ library
                  , bytestring
                  , case-insensitive
                  , containers
+                 , data-default
                  , deepseq
                  , directory
                  , docopt

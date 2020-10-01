@@ -28,58 +28,17 @@ import System.IO
 import System.Posix.Signals
 import qualified Blessings.Internal as Blessings
 import qualified Data.Map as M
-import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
 import qualified Much.Config as Config
 import qualified Notmuch
 import qualified System.Console.Terminal.Size as Term
 
-
-
-emptyState :: State
-emptyState = State
-    { cursor = Z.fromTree (Tree.Node (TVSearch "<emptyState>") [])
-    , xoffset = 0
-    , yoffset = 0
-    , flashMessage = "Welcome to much; quit with ^C"
-    , screenWidth = 0
-    , screenHeight = 0
-    , headBuffer = []
-    , treeBuffer = []
-    , now = UTCTime (fromGregorian 1984 5 23) 49062
-    , signalHandlers = []
-    , query = "tag:inbox AND NOT tag:killed"
-    , keymap = displayKey
-    , mousemap = displayMouse
-    , colorConfig = ColorConfig
-        { tagMap = M.fromList
-            [ ("killed", SGR [38,5,088])
-            , ("star", SGR [38,5,226])
-            , ("draft", SGR [38,5,202])
-            ]
-        , alt = SGR [38,5,182]
-        , search = SGR [38,5,162]
-        , focus = SGR [38,5,160]
-        , unprintableFocus = SGR [38,5,204]
-        , unprintableNormal = SGR [35]
-        , quote = SGR [38,5,242]
-        , boring = SGR [38,5,240]
-        , prefix = SGR [38,5,235]
-        , date = SGR [38,5,071]
-        , tags = SGR [38,5,036]
-        , boringMessage = SGR [38,5,023]
-        , unreadMessage = SGR [38,5,117]
-        , unreadSearch = SGR [38,5,250]
-        }
-    , tagSymbols = M.empty
-    , apiConfig = Much.API.emptyConfig
-    }
-
-
 importConfig :: Config.Config -> State -> State
 importConfig config state = state
   { tagSymbols = fromMaybe (tagSymbols state) (Config.tagSymbols config)
   , query = fromMaybe (query state) (Config.query config)
+  , attachmentDirectory = fromMaybe (attachmentDirectory state) (Config.attachmentDirectory config)
+  , attachmentOverwrite = fromMaybe (attachmentOverwrite state) (Config.attachmentOverwrite config)
   , colorConfig =
     let fromColorConfig key1 key2 = case Config.colorConfig config of
                                       Just colorC -> maybe (key1 (colorConfig state)) SGR (key2 colorC)

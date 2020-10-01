@@ -15,6 +15,7 @@ import Control.Monad.Trans.Except
 import Much.Core
 import Data.Aeson (eitherDecode')
 import Data.CaseInsensitive (CI)
+import Data.Default
 import Data.Foldable (foldrM)
 import Data.List (intercalate)
 import Data.Maybe
@@ -48,7 +49,7 @@ import qualified Notmuch.SearchResult as Notmuch
 
 main :: IO ()
 main =
-    mainWithState emptyState
+    mainWithState def
       { keymap = myKeymap
       , mousemap = myMousemap
       }

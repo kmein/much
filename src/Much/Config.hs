@@ -12,6 +12,8 @@ data Config = Config
   { colorConfig :: Maybe (ColorConfig (Maybe [Word8]))
   , query :: Maybe String
   , tagSymbols :: Maybe (M.Map T.Text T.Text)
+  , attachmentOverwrite :: Maybe Bool
+  , attachmentDirectory :: Maybe FilePath
   } deriving (Generic, Show)
 
 instance FromJSON Config
