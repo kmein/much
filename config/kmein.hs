@@ -1,35 +1,31 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Main (main) where
 
-import Blessings.String
-import Control.Monad
-import Data.Default
-import Data.Maybe
-import Data.Time.Format
 import Much.Action
-import Much.Core
-import Much.State
-import Much.TreeView
-import Scanner
-import System.Directory
-import System.Exit
-import System.FilePath
-import System.IO
-import System.Posix.Signals
-import System.Process
-import Text.Hyphenation
-import Text.LineBreak
-import qualified Data.ByteString.Lazy.Char8 as LBS8
-import qualified Data.Map as M
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import qualified Data.Tree as Tree
-import qualified Data.Tree.Zipper as Z
-import qualified Notmuch
-import qualified Notmuch.Message as Notmuch
+import Much.Core (mainWithState, notmuchSearch)
+import Much.State (State(..), ColorConfig(..))
+import Much.TreeView (TreeView(TVMessagePart), treeViewId, getMessage)
+import Notmuch (notmuchShowPart)
+import Notmuch.Message
+
+import Blessings.String (Blessings(..))
+import Control.Monad ((>=>), unless)
+import Data.Default (Default(..))
+import Data.Functor (($>))
+import Data.Maybe (fromMaybe)
+import Scanner (Scan(ScanMouse), mouseButton, mouseY)
+import System.Directory (doesFileExist)
+import System.FilePath ((</>))
+import System.Posix.Signals (raiseSignal, sigINT)
+import System.Process (callProcess, spawnCommand)
+import qualified Data.ByteString.Lazy.Char8 as LBS8 (writeFile)
+import qualified Data.Text as T (unpack)
+import qualified Data.Text.IO as T (writeFile)
+import qualified Data.Tree.Zipper as Z (label)
 
 {- notmuch's special tags are:
 
@@ -57,14 +53,14 @@ main =
         , boringMessage = SGR [38,5,3]
         , unreadMessage = SGR [38,5,11]
         , unreadSearch = SGR [38,5,15]
-        , tagMap = M.fromList
+        , tagMap =
             [ ("deleted", SGR [38,5,088])
             , ("flagged", SGR [38,5,226])
             , ("draft", SGR [38,5,63])
             , ("spam", SGR [38,5,202])
             ]
         }
-      , tagSymbols = M.fromList
+      , tagSymbols =
           [ ("flagged", "🔖")
           , ("attachment", "📎")
           , ("signed", "🔒")
@@ -72,18 +68,18 @@ main =
       , query = "tag:inbox"
       }
 
-showCurrentMessagePart :: State -> IO (Maybe (Notmuch.Message, Notmuch.MessagePart))
+showCurrentMessagePart :: State -> IO (Maybe (Message, MessagePart))
 showCurrentMessagePart q =
   case Z.label (cursor q) of
     TVMessagePart message part -> do
-      let messageId = Notmuch.unMessageID (Notmuch.messageId message)
-      partResult <- Notmuch.notmuchShowPart messageId (Notmuch.partID part)
+      let m_id = unMessageID (messageId message)
+      partResult <- notmuchShowPart m_id (partID part)
       case partResult of
         Right part' -> return $ Just (message, part')
         Left _ -> return Nothing
     _ -> return Nothing
 
-currentAttachmentPath :: State -> Notmuch.Message -> Notmuch.MessagePart -> FilePath
+currentAttachmentPath :: State -> Message -> MessagePart -> FilePath
 currentAttachmentPath q message part =
   attachmentDirectory q </> attachmentFileName q message part
 
@@ -95,16 +91,15 @@ saveAttachment q =
       let destination = currentAttachmentPath q message part
       alreadyDownloaded <- doesFileExist destination
       if attachmentOverwrite q || not alreadyDownloaded
-         then case Notmuch.partContent part of
-            Notmuch.ContentText text ->
-              q { flashMessage = Plain destination } <$
-                T.writeFile destination text
-            Notmuch.ContentRaw raw _ ->
-              q { flashMessage = Plain destination } <$
-                LBS8.writeFile destination raw
-            _ -> return q { flashMessage = "this part cannot be saved" }
-         else
-            return q { flashMessage = "not overwriting attachment" }
+         then case partContent part of
+                ContentText text ->
+                  T.writeFile destination text $>
+                    q { flashMessage = Plain destination }
+                ContentRaw raw _ ->
+                  LBS8.writeFile destination raw $>
+                    q { flashMessage = Plain destination }
+                _ -> return q { flashMessage = "this part cannot be saved" }
+         else return q { flashMessage = "not overwriting attachment" }
 
 openAttachment :: State -> IO State
 openAttachment q =
@@ -113,11 +108,11 @@ openAttachment q =
     Just (message, part) -> do
       let destination = currentAttachmentPath q message part
       alreadyDownloaded <- doesFileExist destination
-      unless alreadyDownloaded (void $ saveAttachment q)
-      q <$ callProcess "xdg-open" [destination]
+      unless alreadyDownloaded $ saveAttachment q $> ()
+      callProcess "xdg-open" [destination] $> q
 
 reply :: State -> IO State
-reply q = q <$ spawnCommand "i3-sensible-terminal -e $EDITOR -c 'read !mail-reply'"
+reply q = spawnCommand "i3-sensible-terminal -e $EDITOR -c 'read !mail-reply'" $> q
 
 myKeymap :: String -> State -> IO State
 myKeymap "h" = closeFold
@@ -139,7 +134,7 @@ myKeymap "R" = reply
 myKeymap "S" = saveAttachment
 myKeymap "o" = openAttachment
 
-myKeymap "q" = \q -> q <$ raiseSignal sigINT
+myKeymap "q" = \q -> raiseSignal sigINT $> q
 
 myKeymap "*" = toggleTagAtCursor "flagged"
 myKeymap "a" = toggleTagAtCursor "inbox" -- mnemonic: Archive
@@ -158,35 +153,6 @@ myKeymap "\ESC[5~" = \q -> moveTreeDown (screenHeight q `div` 2) q  -- PgUp
 myKeymap "\ESC[6~" = \q -> moveTreeUp (screenHeight q `div` 2) q    -- PgDn
 myKeymap "\ESC[Z" = moveCursorUpToPrevUnread -- S-Tab
 myKeymap "\DEL" = moveToParent  -- backspace
-myKeymap "=" = \q@State{..} ->
-    let cursor' = case Z.label cursor of
-            TVMessageLine a b c s ->
-                wrap (TVMessageLine a b c) cursor s
-            _ -> cursor
-    in return q { cursor = cursor' }
-  where
-
-    --unwrap = error "WIP"
-        -- 1. get current id (must be TVMessageLine)
-        -- 2. find first adjoined TVMessageLine with same id
-        -- 3. find last adjoined TVMessageLine with same id
-        -- 4. join lines (with space?)
-
-    wrap ctor loc s =
-        fromMaybe (error "die hard") $
-        Z.nextTree $
-        foldr (insert . ctor)
-              (Z.delete loc)
-              $ hy s
-
-    insert a =
-        Z.prevSpace . Z.insert (Tree.Node a [])
-
-    hy = breakStringLn bf
-      where
-        shy = '\173'
-        hyp = Just german_1996
-        bf = BreakFormat 80 8 shy hyp
 
 -- <F1>
 myKeymap "\ESC[11~" = \q@State{..} ->
@@ -197,7 +163,7 @@ myKeymap "\ESC[12~" = \q@State{..} ->
     return q { flashMessage =
                   Plain $
                   show $
-                  fmap Notmuch.messageFilename $
+                  fmap messageFilename $
                   getMessage $
                   Z.label cursor
               }

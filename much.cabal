@@ -40,17 +40,13 @@ executable much-kmein
                   , base
                   , blessings
                   , bytestring
-                  , containers
                   , data-default
                   , directory
                   , filepath
-                  , hyphenation
-                  , linebreak
                   , process
                   , rosezipper
                   , scanner
                   , text
-                  , time
                   , unix
 
 library
