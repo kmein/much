@@ -11,6 +11,7 @@ import GHC.Generics
 import Much.TreeView (TreeView(TVSearch))
 import Scanner
 import System.Posix.Signals
+import qualified Data.CaseInsensitive as CI
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Tree as Tree
@@ -107,5 +108,15 @@ instance Default State where
       , attachmentFileName = \message part ->
           case Notmuch.partContentFilename part of
             Just partFileName -> T.unpack partFileName
-            Nothing -> concat [ "much_" , formatTime defaultTimeLocale "%s" (Notmuch.messageTime message) , "_" , show (Notmuch.partID part) ]
+            Nothing ->
+              "much_"
+              <> formatTime defaultTimeLocale "%s" (Notmuch.messageTime message)
+              <> "_"
+              <> show (Notmuch.partID part)
+              <> extension (Notmuch.partContentType part)
       }
+
+extension :: CI.CI T.Text -> String
+extension "text/html" = ".html"
+extension "text/plain" = ".txt"
+extension _ = ""
