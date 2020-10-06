@@ -16,6 +16,7 @@ import Blessings
 import Control.Arrow
 import Data.Char
 import Data.Function
+import Data.Functor.Identity
 import Data.Maybe
 import Data.Time
 import Data.Time.Format.Human
@@ -24,6 +25,8 @@ import Much.State
 import Much.TagUtils (Tag)
 import Much.TreeView
 
+color :: (t -> Identity Pm) -> t -> Blessings a -> Blessings a
+color key config = SGR $ runIdentity $ key config
 
 -- TODO make configurable
 humanTimeLocale :: HumanTimeLocale
@@ -100,10 +103,10 @@ spacePrefix
     , pipePrefix
     , endPrefix
     :: State -> Blessings String
-spacePrefix q = prefix (colorConfig q) "  "
-teePrefix q = prefix (colorConfig q) "├╴"
-pipePrefix q = prefix (colorConfig q) "│ "
-endPrefix q = prefix (colorConfig q) "└╴"
+spacePrefix q = color prefix (colorConfig q) "  "
+teePrefix q = color prefix (colorConfig q) "├╴"
+pipePrefix q = color prefix (colorConfig q) "│ "
+endPrefix q = color prefix (colorConfig q) "└╴"
 
 
 -- TODO locale-style: headerKey = \s -> SGR [..] (s <> ": ")
@@ -113,41 +116,41 @@ renderTreeView1 :: State -> Bool -> TreeView -> Blessings String
 renderTreeView1 q@State{..} hasFocus x = case x of
 
     TVSearch s ->
-        let c = if hasFocus then focus colorConfig else search colorConfig
+        let c = if hasFocus then color focus colorConfig else color search colorConfig
         in c $ Plain s
 
     TVSearchResult sr ->
         let c
-                | hasFocus = focus colorConfig
-                | isUnread = unreadSearch colorConfig
-                | otherwise = boring colorConfig
+                | hasFocus = color focus colorConfig
+                | isUnread = color unreadSearch colorConfig
+                | otherwise = color boring colorConfig
             c_authors
-                | hasFocus = focus colorConfig
-                | isUnread = alt colorConfig
-                | otherwise = boring colorConfig
+                | hasFocus = color focus colorConfig
+                | isUnread = color alt colorConfig
+                | otherwise = color boring colorConfig
 
             isUnread = "unread" `elem` Notmuch.searchTags sr
 
             authors = Plain $ T.unpack $ Notmuch.searchAuthors sr
-            date = Much.State.date colorConfig $ renderDate now x
+            date = color Much.State.date colorConfig $ renderDate now x
             subject = Plain $ T.unpack $ Notmuch.searchSubject sr
-            tags = Much.State.tags colorConfig $ renderTags q (Notmuch.searchTags sr)
+            tags = color Much.State.tags colorConfig $ renderTags q (Notmuch.searchTags sr)
             title = if subject /= "" then subject else c_authors authors
         in
           c $ title <> " " <> date <> " " <> tags
 
     TVMessage m ->
         let fromSGR
-                | hasFocus = focus colorConfig
-                | "unread" `elem` Notmuch.messageTags m = unreadMessage colorConfig
-                | otherwise = boringMessage colorConfig
+                | hasFocus = color focus colorConfig
+                | "unread" `elem` Notmuch.messageTags m = color unreadMessage colorConfig
+                | otherwise = color boringMessage colorConfig
             from = fromSGR $ renderFrom (M.lookup "from" $ Notmuch.messageHeaders m)
-            date = Much.State.date colorConfig $ renderDate now x
-            tags = Much.State.tags colorConfig $ renderTags q (Notmuch.messageTags m) -- TODO filter common tags
+            date = color Much.State.date colorConfig $ renderDate now x
+            tags = color Much.State.tags colorConfig $ renderTags q (Notmuch.messageTags m) -- TODO filter common tags
         in from <> " " <> date <> " " <> tags
 
     TVMessageHeaderField m fieldName ->
-        let c = if hasFocus then focus colorConfig else boring colorConfig
+        let c = if hasFocus then color focus colorConfig else color boring colorConfig
             k = Plain $ T.unpack $ CI.original fieldName
             v = maybe "nothing"
                       (Plain . T.unpack)
@@ -155,7 +158,7 @@ renderTreeView1 q@State{..} hasFocus x = case x of
         in c $ k <> ": " <> v
 
     TVMessagePart _ p ->
-        let c = if hasFocus then focus colorConfig else boring colorConfig
+        let c = if hasFocus then color focus colorConfig else color boring colorConfig
             i = Plain $ show $ Notmuch.partID p
             t = Plain $ T.unpack $ CI.original $ Notmuch.partContentType p
             filename = maybe "" (Plain . (" "<>) . show) $ Notmuch.partContentFilename p
@@ -165,8 +168,8 @@ renderTreeView1 q@State{..} hasFocus x = case x of
 
     TVMessageQuoteLine _ _ _ s ->
         if hasFocus
-            then focus colorConfig $ Plain s
-            else quote colorConfig $ Plain s
+            then color focus colorConfig $ Plain s
+            else color quote colorConfig $ Plain s
 
     TVMessageRawLine _ _ _ s ->
         mconcat . map (uncurry renderClassifiedString) $ classifiedGroupBy isPrint s
@@ -178,8 +181,8 @@ renderTreeView1 q@State{..} hasFocus x = case x of
 
         (printableColor, unprintableColor) =
             if hasFocus
-              then (focus colorConfig, unprintableFocus colorConfig)
-              else (quote colorConfig, unprintableNormal colorConfig)
+              then (color focus colorConfig, color unprintableFocus colorConfig)
+              else (color quote colorConfig, color unprintableNormal colorConfig)
 
         showLitChar' :: String -> String
         showLitChar' = (>>= f)
@@ -192,7 +195,7 @@ renderTreeView1 q@State{..} hasFocus x = case x of
 
     TVMessageLine _ _ _ s ->
         if hasFocus
-            then focus colorConfig $ Plain s
+            then color focus colorConfig $ Plain s
             else Plain s
 
 
@@ -220,8 +223,8 @@ renderTags state =
 
 
 renderTag :: State -> Tag -> Blessings String
-renderTag state tag = case M.lookup tag (tagMap (colorConfig state)) of
-    Just visual -> visual plain
+renderTag state tag = case M.lookup tag $ runIdentity $ tagMap $ colorConfig state of
+    Just visual -> SGR (runIdentity visual) plain
     Nothing -> plain
   where
     plain = Plain $ T.unpack $ fromMaybe tag $ M.lookup tag (tagSymbols state)

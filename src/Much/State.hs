@@ -6,6 +6,7 @@ module Much.State where
 import Blessings
 import Data.Aeson
 import Data.Default
+import Data.Functor.Identity
 import Data.Time
 import GHC.Generics
 import Much.TreeView (TreeView(TVSearch))
@@ -34,7 +35,7 @@ data State = State
     , keymap :: String -> State -> IO State
     , mousemap :: Scan -> State -> IO State
     , tagSymbols :: M.Map T.Text T.Text
-    , colorConfig :: ColorConfig (Blessings String -> Blessings String)
+    , colorConfig :: ColorConfig Identity
     , apiConfig :: Much.API.Config.Config
     , attachmentOverwrite :: Bool
     , attachmentDirectory :: FilePath
@@ -44,46 +45,47 @@ data State = State
 instance Show (State -> IO ()) where
     show = const "λ"
 
-data ColorConfig a = ColorConfig
-    { alt :: a
-    , search :: a
-    , focus :: a
-    , quote :: a
-    , boring :: a
-    , prefix :: a
-    , date :: a
-    , tags :: a
-    , unreadSearch :: a
-    , unreadMessage :: a
-    , boringMessage :: a
-    , tagMap :: M.Map T.Text a
-    , unprintableFocus :: a
-    , unprintableNormal :: a
-    } deriving (Generic, Show)
+data ColorConfig f = ColorConfig
+    { alt :: f Pm
+    , search :: f Pm
+    , focus :: f Pm
+    , quote :: f Pm
+    , boring :: f Pm
+    , prefix :: f Pm
+    , date :: f Pm
+    , tags :: f Pm
+    , unreadSearch :: f Pm
+    , unreadMessage :: f Pm
+    , boringMessage :: f Pm
+    , tagMap :: f (M.Map T.Text (f Pm))
+    , unprintableFocus :: f Pm
+    , unprintableNormal :: f Pm
+    } deriving (Generic)
 
-instance Default (ColorConfig (Blessings String -> Blessings String)) where
+instance Applicative f => Default (ColorConfig f) where
   def = ColorConfig
-    { tagMap = M.fromList
-        [ ("killed", SGR [38,5,088])
-        , ("star", SGR [38,5,226])
-        , ("draft", SGR [38,5,202])
+    { tagMap = pure $ M.fromList
+        [ ("killed", pure [38,5,088])
+        , ("star", pure [38,5,226])
+        , ("draft", pure [38,5,202])
         ]
-    , alt = SGR [38,5,182]
-    , search = SGR [38,5,162]
-    , focus = SGR [38,5,160]
-    , unprintableFocus = SGR [38,5,204]
-    , unprintableNormal = SGR [35]
-    , quote = SGR [38,5,242]
-    , boring = SGR [38,5,240]
-    , prefix = SGR [38,5,235]
-    , date = SGR [38,5,071]
-    , tags = SGR [38,5,036]
-    , boringMessage = SGR [38,5,023]
-    , unreadMessage = SGR [38,5,117]
-    , unreadSearch = SGR [38,5,250]
+    , alt = pure [38,5,182]
+    , search = pure [38,5,162]
+    , focus = pure [38,5,160]
+    , unprintableFocus = pure [38,5,204]
+    , unprintableNormal = pure [35]
+    , quote = pure [38,5,242]
+    , boring = pure [38,5,240]
+    , prefix = pure [38,5,235]
+    , date = pure [38,5,071]
+    , tags = pure [38,5,036]
+    , boringMessage = pure [38,5,023]
+    , unreadMessage = pure [38,5,117]
+    , unreadSearch = pure [38,5,250]
     }
 
-instance FromJSON a => FromJSON (ColorConfig a)
+instance FromJSON (ColorConfig Maybe)
+instance Show (ColorConfig Maybe)
 
 instance Default State where
   def = State

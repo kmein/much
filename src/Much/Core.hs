@@ -9,6 +9,7 @@ import Control.Concurrent
 import Control.Monad
 import Data.Aeson
 import Data.Functor
+import Data.Functor.Identity
 import Data.Maybe
 import Data.Time
 import Much.API
@@ -40,16 +41,18 @@ importConfig config state = state
   , attachmentDirectory = fromMaybe (attachmentDirectory state) (Config.attachmentDirectory config)
   , attachmentOverwrite = fromMaybe (attachmentOverwrite state) (Config.attachmentOverwrite config)
   , colorConfig =
-    let fromColorConfig key1 key2 = case Config.colorConfig config of
-                                      Just colorC -> maybe (key1 (colorConfig state)) SGR (key2 colorC)
-                                      Nothing -> key1 (colorConfig state)
+    let fromColorConfig key1 key2 =
+          case Config.colorConfig config of
+            Just colorC -> maybe (key1 (colorConfig state)) Identity (key2 colorC)
+            Nothing -> key1 (colorConfig state)
     in ColorConfig
       { tagMap =
-        case tagMap <$> Config.colorConfig config of
+        case tagMap =<< Config.colorConfig config of
           Just tagMap' ->
+            Identity $
             M.foldlWithKey
-              (\previous k v -> maybe previous (\code -> M.insert k (SGR code) previous) v)
-              (tagMap (colorConfig state))
+              (\previous k v -> maybe previous (\code -> M.insert k (Identity code) previous) v)
+              (runIdentity $ tagMap (colorConfig state))
               tagMap'
           Nothing -> tagMap (colorConfig state)
       , alt = fromColorConfig alt alt

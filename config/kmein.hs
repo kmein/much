@@ -42,22 +42,22 @@ main =
       { keymap = myKeymap
       , mousemap = myMousemap
       , colorConfig = def
-        { boring = SGR [38,5,8]
-        , alt = SGR [38,5,182]
-        , search = SGR [38,5,13]
-        , focus = SGR [38,5,4]
-        , quote = SGR [38,5,7]
-        , prefix = SGR [38,5,235]
-        , date = SGR [38,5,1]
-        , tags = SGR [38,5,14]
-        , boringMessage = SGR [38,5,3]
-        , unreadMessage = SGR [38,5,11]
-        , unreadSearch = SGR [38,5,15]
-        , tagMap =
-            [ ("deleted", SGR [38,5,088])
-            , ("flagged", SGR [38,5,226])
-            , ("draft", SGR [38,5,63])
-            , ("spam", SGR [38,5,202])
+        { boring = pure [38,5,8]
+        , alt = pure [38,5,182]
+        , search = pure [38,5,13]
+        , focus = pure [38,5,4]
+        , quote = pure [38,5,7]
+        , prefix = pure [38,5,235]
+        , date = pure [38,5,1]
+        , tags = pure [38,5,14]
+        , boringMessage = pure [38,5,3]
+        , unreadMessage = pure [38,5,11]
+        , unreadSearch = pure [38,5,15]
+        , tagMap = pure
+            [ ("deleted", pure [38,5,088])
+            , ("flagged", pure [38,5,226])
+            , ("draft", pure [38,5,63])
+            , ("spam", pure [38,5,202])
             ]
         }
       , tagSymbols =
