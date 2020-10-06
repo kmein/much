@@ -96,6 +96,17 @@ moveToParent q@State{..} =
                 i -> moveTreeDown i q'
 
 
+moveCursorToThread :: Monad m => State -> m State
+moveCursorToThread q@State{..} =
+    case Z.label cursor of
+        TVSearch _ ->
+            return q { flashMessage = "cannot go further up" }
+        TVSearchResult _ ->
+            return q
+        _ ->
+            moveToParent q >>= moveCursorToThread
+
+
 moveCursorToUnread
     :: (Num a, Monad m, Eq a)
     => (Z.TreePos Z.Full TreeView -> Maybe (Z.TreePos Z.Full TreeView))
