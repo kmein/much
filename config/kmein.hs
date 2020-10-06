@@ -119,14 +119,16 @@ myKeymap "h" = closeFold
 myKeymap "l" = openFold
 myKeymap " " = toggleFold
 
-myKeymap "g" = moveCursorUp 150
-myKeymap "G" = moveCursorDown 150
+myKeymap "g" = moveCursorToThread >=> moveCursorToFirstOnSameLevel
+myKeymap "G" = moveCursorToThread >=> moveCursorToLastOnSameLevel
 myKeymap "k" = moveCursorUp 1
 myKeymap "j" = moveCursorDown 1
 myKeymap "\ESC[A" = moveCursorDown 1
 myKeymap "\ESC[B" = moveCursorUp 1
 myKeymap "\ESC[C" = moveTreeLeft 10  -- left
 myKeymap "\ESC[D" = moveTreeRight 10 -- right
+
+myKeymap "H" = moveCursorToThread
 
 myKeymap "r" = notmuchSearch
 
