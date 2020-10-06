@@ -16,12 +16,16 @@ import Text.Hyphenation
 import Text.LineBreak
 import qualified Data.Tree as Tree
 import qualified Data.Tree.Zipper as Z
+import qualified Much.API
 import qualified Notmuch.Message as Notmuch
 
 main :: IO ()
 main =
     mainWithState def
-      { keymap = myKeymap
+      { apiConfig = def
+          { Much.API.socketPath = "/home/tv/tmp/much/warp.sock"
+          }
+      , keymap = myKeymap
       , mousemap = myMousemap
       }
 
