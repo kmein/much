@@ -25,7 +25,7 @@ import Much.State
 import Much.TagUtils (Tag)
 import Much.TreeView
 
-color :: (t -> Identity Pm) -> t -> Blessings a -> Blessings a
+color :: (ColorConfig Identity -> Identity Pm) -> ColorConfig Identity -> Blessings String -> Blessings String
 color key config = SGR $ runIdentity $ key config
 
 -- TODO make configurable
