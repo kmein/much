@@ -4,6 +4,7 @@
 module Much.Action where
 
 import Blessings.String
+import Data.Maybe
 import Scanner
 import Much.State
 import Much.TagUtils
@@ -105,6 +106,16 @@ moveCursorToThread q@State{..} =
             return q
         _ ->
             moveToParent q >>= moveCursorToThread
+
+
+moveCursorToFirstOnSameLevel :: Monad m => State -> m State
+moveCursorToFirstOnSameLevel q@State{..} =
+    return q { cursor = fromMaybe cursor . Z.nextTree . Z.first . Z.prevSpace $ cursor }
+
+
+moveCursorToLastOnSameLevel :: Monad m => State -> m State
+moveCursorToLastOnSameLevel q@State{..} =
+    return q { cursor = fromMaybe cursor . Z.prevTree . Z.last . Z.nextSpace $ cursor }
 
 
 moveCursorToUnread
