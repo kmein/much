@@ -34,7 +34,7 @@ data State = State
     , query :: String
     , keymap :: String -> State -> IO State
     , mousemap :: Scan -> State -> IO State
-    , tagSymbols :: M.Map T.Text T.Text
+    , aliases :: M.Map T.Text T.Text
     , colorConfig :: ColorConfig Identity
     , apiConfig :: Much.API.Config.Config
     , attachmentOverwrite :: Bool
@@ -85,7 +85,6 @@ instance Applicative f => Default (ColorConfig f) where
     }
 
 instance FromJSON (ColorConfig Maybe)
-instance Show (ColorConfig Maybe)
 
 instance Default State where
   def = State
@@ -103,7 +102,7 @@ instance Default State where
       , keymap = const return
       , mousemap = const return
       , colorConfig = def
-      , tagSymbols = M.empty
+      , aliases = M.empty
       , apiConfig = def
       , attachmentOverwrite = False
       , attachmentDirectory = "/tmp"

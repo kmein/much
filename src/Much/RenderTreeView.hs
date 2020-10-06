@@ -227,7 +227,7 @@ renderTag state tag = case M.lookup tag $ runIdentity $ tagMap $ colorConfig sta
     Just visual -> SGR (runIdentity visual) plain
     Nothing -> plain
   where
-    plain = Plain $ T.unpack $ fromMaybe tag $ M.lookup tag (tagSymbols state)
+    plain = Plain $ T.unpack $ fromMaybe tag $ M.lookup tag (aliases state)
 
 
 dropAddress :: String -> String

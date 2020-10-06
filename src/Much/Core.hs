@@ -36,7 +36,7 @@ import qualified System.Console.Terminal.Size as Term
 
 importConfig :: Config.Config -> State -> State
 importConfig config state = state
-  { tagSymbols = fromMaybe (tagSymbols state) (Config.tagSymbols config)
+  { aliases = fromMaybe (aliases state) (Config.aliases config)
   , query = fromMaybe (query state) (Config.query config)
   , attachmentDirectory = fromMaybe (attachmentDirectory state) (Config.attachmentDirectory config)
   , attachmentOverwrite = fromMaybe (attachmentOverwrite state) (Config.attachmentOverwrite config)

@@ -10,9 +10,9 @@ import qualified Data.Map as M
 data Config = Config
   { colorConfig :: Maybe (ColorConfig Maybe)
   , query :: Maybe String
-  , tagSymbols :: Maybe (M.Map T.Text T.Text)
+  , aliases :: Maybe (M.Map T.Text T.Text)
   , attachmentOverwrite :: Maybe Bool
   , attachmentDirectory :: Maybe FilePath
-  } deriving (Generic, Show)
+  } deriving (Generic)
 
 instance FromJSON Config

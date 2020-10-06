@@ -60,7 +60,7 @@ main =
             , ("spam", pure [38,5,202])
             ]
         }
-      , tagSymbols =
+      , aliases =
           [ ("flagged", "🔖")
           , ("attachment", "📎")
           , ("signed", "🔒")
