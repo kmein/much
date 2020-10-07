@@ -112,7 +112,7 @@ openAttachment q =
       callProcess "xdg-open" [destination] $> q
 
 reply :: State -> IO State
-reply q = spawnCommand "i3-sensible-terminal -e $EDITOR -c 'read !mail-reply'" $> q
+reply q = spawnCommand "alacritty -e nvim -c 'read! mail-reply' -c 'execute \"normal gg\" | set filetype=mail'" $> q
 
 myKeymap :: String -> State -> IO State
 myKeymap "h" = closeFold
