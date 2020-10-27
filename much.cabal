@@ -90,7 +90,6 @@ library
                  , data-default
                  , deepseq
                  , directory
-                 , docopt
                  , either
                  , email-header
                  , filepath
